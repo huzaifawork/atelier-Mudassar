@@ -38,6 +38,7 @@ yarn-error.log*
 
 # raw client reference material / working PDF-extraction assets (not used by the app)
 /reference
+/public/Atelier Mudassar Portfolio.pdf
 
 # typescript
 *.tsbuildinfo

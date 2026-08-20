@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Atelier Mudassar
 
-## Getting Started
+Digital fine art portfolio for Mudassar Ghaffar, built with Next.js (App
+Router), Tailwind CSS, and Supabase. Public site plus a password-protected
+admin panel for managing gallery artwork and contact-form messages.
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router, Turbopack) + React 19 + TypeScript
+- **Tailwind CSS v4**
+- **Supabase** — Postgres (gallery + contact data), Storage (private artwork
+  images), Auth (admin login)
+- **Resend** — contact form and admin reply emails
+- **Framer Motion** — animation
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Copy these into `.env.local` (never committed — see `.gitignore`):
 
-## Learn More
+| Variable | Used for |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public, RLS-scoped Supabase client |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only, bypasses RLS — admin writes and storage |
+| `ADMIN_EMAILS` | Comma-separated allowlist for `/admin` access |
+| `RESEND_API_KEY` | Sends the contact form email and admin replies |
+| `CONTACT_TO_EMAIL` | Inbox that contact-form submissions are sent to |
 
-To learn more about Next.js, take a look at the following resources:
+Run `supabase/schema.sql` in the Supabase SQL editor once (safe to re-run —
+every statement is guarded). Create the first admin account with:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+node scripts/create-admin.mjs owner@example.com
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project layout
 
-## Deploy on Vercel
+- `src/app/components/` — public site sections (Hero, Gallery, Contact, …)
+- `src/app/admin/` — gallery and messages management UI
+- `src/app/api/` — route handlers (gallery CRUD, contact, auth, messages)
+- `src/app/lib/` — Supabase clients, auth/admin guards, rate limiting
+- `supabase/schema.sql` — full database schema, RLS policies, storage bucket
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deploying
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Deployed on Vercel. Set the environment variables above in the project's
+Vercel dashboard (Production, and Preview/Development as needed) — they are
+not read from any committed file.

@@ -16,7 +16,7 @@ export default function Process() {
         >
           <span className="text-copper text-xs tracking-[0.4em] uppercase">Behind the Work</span>
           <h2 className="font-display text-4xl sm:text-5xl text-charcoal mt-4">Painting Process</h2>
-          <p className="text-charcoal/60 max-w-xl mx-auto mt-5 leading-relaxed">
+          <p className="text-charcoal/75 max-w-xl mx-auto mt-5 leading-relaxed">
             Each work is developed entirely by hand using a painterly digital approach inspired by
             traditional fine art practices — from initial sketch, to color block-in, to final refinement.
           </p>
@@ -53,7 +53,7 @@ export default function Process() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.3 }}
           transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-          className="relative rounded-sm overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.25)] border border-charcoal/10 aspect-[16/8.8]"
+          className="relative rounded-sm overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.25)] border border-charcoal/10 aspect-[16/9]"
         >
           <Image
             src="/art/process2.png"

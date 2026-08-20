@@ -6,8 +6,15 @@ import Gallery from "./components/Gallery";
 import Process from "./components/Process";
 import Contact from "./components/Contact";
 import ScrollProgress from "./components/ScrollProgress";
+import { GalleryProvider } from "./lib/galleryStore";
+import { fetchGallery } from "./lib/galleryServer";
 
-export default function Home() {
+// Admin edits should show up on the next visit without a redeploy.
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const { items, settings } = await fetchGallery();
+
   return (
     <>
       <ScrollProgress />
@@ -16,7 +23,9 @@ export default function Home() {
       <Hero />
       <About />
       <Statement />
-      <Gallery />
+      <GalleryProvider initialItems={items} initialSettings={settings}>
+        <Gallery />
+      </GalleryProvider>
       <Process />
       <Contact />
     </>
