@@ -18,7 +18,9 @@ const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https://i.ytimg.com",
+  // blob: is for the admin upload form's local preview (URL.createObjectURL)
+  // of a picked file, before it's actually uploaded.
+  "img-src 'self' data: blob: https://i.ytimg.com",
   "font-src 'self'",
   "frame-src 'self' https://www.youtube-nocookie.com",
   "connect-src 'self'",
