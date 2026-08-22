@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   categoryLabels,
   statusLabels,
@@ -114,10 +115,14 @@ export default function AdminGalleryPage() {
             className="grid grid-cols-[76px_1fr] sm:grid-cols-[76px_1fr_auto] gap-4 items-start border border-gold/15 bg-espresso/40 p-3 hover:border-gold/30 transition-colors"
           >
             <div className="relative aspect-3/4 w-full bg-espresso overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              {/* A small, optimized thumbnail — not the full-resolution
+                  original — keeps this list fast even with many large
+                  admin-uploaded images. */}
+              <Image
                 src={imageSrcFor(item.image)}
                 alt=""
+                width={96}
+                height={128}
                 className="w-full h-full object-cover"
                 onContextMenu={(event) => event.preventDefault()}
               />
@@ -172,15 +177,21 @@ export default function AdminGalleryPage() {
 
               <select
                 aria-label={`Status for ${item.title}`}
-                value={item.status ?? "completed"}
+                value={item.status ?? ""}
                 disabled={busy === item.id}
                 onChange={(event) =>
                   run(item.id, () =>
-                    setStatus(item.id, event.target.value as ArtworkStatus),
+                    setStatus(
+                      item.id,
+                      event.target.value === ""
+                        ? undefined
+                        : (event.target.value as ArtworkStatus),
+                    ),
                   )
                 }
                 className="px-2 py-1.5 text-[0.62rem] tracking-[0.12em] uppercase bg-espresso border border-gold/20 text-cream-dim hover:border-gold/50 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-bright"
               >
+                <option value="">No status</option>
                 {statusOrder.map((key) => (
                   <option key={key} value={key}>
                     {statusLabels[key]}

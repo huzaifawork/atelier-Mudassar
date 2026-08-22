@@ -1,8 +1,9 @@
 export type Category = "portrait" | "wildlife" | "landscape";
 
 /** Add a new status by appending here + to `statusLabels`; the admin select,
- *  the card capsule, and the lightbox badge all read from these two. */
-export const statusOrder = ["completed", "in-progress"] as const;
+ *  the card capsule, and the lightbox badge all read from these two. Status is
+ *  optional — leaving it unset shows no badge at all. */
+export const statusOrder = ["in-progress"] as const;
 export type ArtworkStatus = (typeof statusOrder)[number];
 
 export interface Artwork {
@@ -38,7 +39,6 @@ export const categoryLabels: Record<Category, string> = {
 };
 
 export const statusLabels: Record<ArtworkStatus, string> = {
-  completed: "Completed",
   "in-progress": "In Progress",
 };
 
@@ -64,7 +64,6 @@ const seed: ArtworkDraft[] = [
       "A reflection on quiet strength and the dignity found in ordinary individuals. Rather than portraying heroism through dramatic action, the work celebrates resilience expressed through composure, presence, and self-assurance.",
     image: "/art/page04_art.png",
     dimensions: "907 × 1215 px",
-    status: "completed",
   },
   {
     slug: "portrait-of-lloyd-robertson",
@@ -76,7 +75,6 @@ const seed: ArtworkDraft[] = [
       "Reflects the enduring values of integrity, wisdom, and public trust. Created using a painterly digital workflow inspired by classical portraiture, with controlled lighting and refined brushwork to emphasize character over spectacle.",
     image: "/art/page05_art.png",
     dimensions: "907 × 1215 px",
-    status: "completed",
   },
   {
     slug: "communion",
@@ -88,7 +86,6 @@ const seed: ArtworkDraft[] = [
       "A commissioned work preserving a moment of faith, devotion, and cultural tradition — reflecting the quiet reverence and shared sense of belonging that define such occasions.",
     image: "/art/page06_art.png",
     dimensions: "809 × 1215 px",
-    status: "completed",
   },
   {
     slug: "aarti",
@@ -100,7 +97,6 @@ const seed: ArtworkDraft[] = [
       "Inspired by the sacred ritual of offering light, exploring the relationship between physical illumination and inner awakening — fire as a symbol of devotion and transformation.",
     image: "/art/page07_art.png",
     dimensions: "810 × 1215 px",
-    status: "completed",
   },
   {
     slug: "pilgrim-of-peace",
@@ -112,7 +108,6 @@ const seed: ArtworkDraft[] = [
       "Reflects a life shaped by faith, compassion, and selfless service — honoring the quiet strength found in humility and the wisdom gained through a lifetime devoted to others.",
     image: "/art/page08_art.png",
     dimensions: "907 × 1215 px",
-    status: "completed",
   },
   {
     slug: "stillness",
@@ -124,7 +119,6 @@ const seed: ArtworkDraft[] = [
       "Explores the quiet strength that emerges from a life shaped by faith, compassion, and service — the enduring power of humility and inner peace.",
     image: "/art/page09_art.png",
     dimensions: "907 × 1159 px",
-    status: "completed",
   },
   {
     slug: "silent-resolve",
@@ -136,7 +130,6 @@ const seed: ArtworkDraft[] = [
       "Explores the strength that exists without display or recognition — resilience revealed through composure, conviction, and quiet confidence.",
     image: "/art/page10_art.png",
     dimensions: "907 × 1215 px",
-    status: "completed",
   },
   {
     slug: "resolve",
@@ -148,7 +141,6 @@ const seed: ArtworkDraft[] = [
       "Explores the quiet determination that defines character beyond outward appearance — confidence expressed through composure rather than dramatic action.",
     image: "/art/page11_art.png",
     dimensions: "890 × 1215 px",
-    status: "completed",
   },
   {
     slug: "quiet-moment",
@@ -160,7 +152,6 @@ const seed: ArtworkDraft[] = [
       "Reflects the value of stillness in a world often defined by constant movement, inviting viewers to appreciate the quiet dignity found in ordinary moments.",
     image: "/art/page12_art.png",
     dimensions: "907 × 1215 px",
-    status: "completed",
   },
   {
     slug: "shadow-walker",
@@ -172,7 +163,6 @@ const seed: ArtworkDraft[] = [
       "Explores the quiet authority of the black panther — a symbol of patience, instinct, and purposeful restraint, emerging from darkness into light.",
     image: "/art/page13_art.png",
     dimensions: "810 × 1215 px",
-    status: "completed",
   },
   {
     slug: "silent-watcher",
@@ -184,7 +174,6 @@ const seed: ArtworkDraft[] = [
       "Explores the quiet wisdom and unwavering awareness embodied by the wolf — strength found in patience, observation, and purposeful restraint.",
     image: "/art/page14_art.png",
     dimensions: "907 × 947 px",
-    status: "completed",
   },
   {
     slug: "songbird",
@@ -196,7 +185,6 @@ const seed: ArtworkDraft[] = [
       "Celebrates the quiet beauty that often goes unnoticed in the natural world — grace, resilience, and wonder found in the simplest moments.",
     image: "/art/page15_art.png",
     dimensions: "810 × 1215 px",
-    status: "completed",
   },
   {
     slug: "lilac-roller",
@@ -208,7 +196,6 @@ const seed: ArtworkDraft[] = [
       "Celebrates the remarkable harmony of color and form found in the natural world, reflecting both the diversity and artistry of nature itself.",
     image: "/art/page16_art.png",
     dimensions: "907 × 896 px",
-    status: "completed",
   },
   {
     slug: "french-village",
@@ -220,7 +207,6 @@ const seed: ArtworkDraft[] = [
       "Inspired by the timeless charm of historic European streets — the enduring character of streets shaped by history, craftsmanship, and tradition.",
     image: "/art/page17_art.png",
     dimensions: "810 × 1215 px",
-    status: "completed",
   },
   {
     slug: "ancient-columns",
@@ -232,7 +218,6 @@ const seed: ArtworkDraft[] = [
       "Reflects on the enduring dialogue between history, architecture, and time — weathered stone as testament to civilizations long after their voices have faded.",
     image: "/art/page18_art.png",
     dimensions: "810 × 1215 px",
-    status: "completed",
   },
   {
     slug: "autumn-creek",
@@ -244,7 +229,6 @@ const seed: ArtworkDraft[] = [
       "Reflects on the quiet harmony that emerges when light, water, and woodland exist in balance — nature's continual cycle of transformation and renewal.",
     image: "/art/page19_art.png",
     dimensions: "907 × 929 px",
-    status: "completed",
   },
   {
     slug: "mount-egmont",
@@ -256,7 +240,6 @@ const seed: ArtworkDraft[] = [
       "Explores the quiet grandeur of one of New Zealand's most iconic volcanic landscapes — harmony between mountain, water, and sky.",
     image: "/art/page20_art.png",
     dimensions: "907 × 947 px",
-    status: "completed",
   },
   {
     slug: "desert-solitude",
@@ -268,7 +251,6 @@ const seed: ArtworkDraft[] = [
       "Reflects on the enduring resilience found within seemingly unforgiving landscapes — strength, simplicity, and stillness beneath a vast expanse of sky.",
     image: "/art/page21_art.png",
     dimensions: "907 × 913 px",
-    status: "completed",
   },
 ];
 

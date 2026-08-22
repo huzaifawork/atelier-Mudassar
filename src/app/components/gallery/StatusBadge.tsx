@@ -2,12 +2,10 @@ import type { ArtworkStatus } from "../../data/artworks";
 import { statusLabels } from "../../data/artworks";
 
 const statusStyles: Record<ArtworkStatus, string> = {
-  completed: "border-gold/50 bg-ink/70 text-gold-bright",
   "in-progress": "border-copper/60 bg-ink/70 text-copper",
 };
 
 const dotStyles: Record<ArtworkStatus, string> = {
-  completed: "bg-gold-bright",
   "in-progress": "bg-copper animate-pulse",
 };
 

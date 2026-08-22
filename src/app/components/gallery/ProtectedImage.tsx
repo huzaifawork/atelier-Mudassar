@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { imageSrcFor } from "../../lib/galleryMap";
 
 const MAX_DPR = 2;
-const LENS_SIZE = 130;
+const LENS_SIZE = 240;
 const ZOOM = 2.3;
 
 function drawCover(
@@ -189,8 +189,8 @@ export default function ProtectedImage({
     // doesn't dominate a small phone screen.
     const size = Math.round(
       Math.max(
-        90,
-        Math.min(LENS_SIZE, Math.min(rect.width, rect.height) * 0.42),
+        140,
+        Math.min(LENS_SIZE, Math.min(rect.width, rect.height) * 0.55),
       ),
     );
     setLensSize(size);
@@ -315,13 +315,13 @@ export default function ProtectedImage({
             ready && showHint ? "opacity-100" : "opacity-0"
           }`}
         >
-          <span className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-ink/70 backdrop-blur-sm px-3.5 py-1.5 text-[0.65rem] tracking-[0.15em] uppercase text-cream-dim/90">
+          <span className="inline-flex items-center gap-2.5 rounded-full border border-gold/30 bg-ink/70 backdrop-blur-sm px-4 py-2 text-xs tracking-[0.15em] uppercase text-cream-dim/90">
             <svg
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="1.8"
-              className="w-3.5 h-3.5 shrink-0"
+              className="w-5 h-5 shrink-0"
             >
               <circle cx="10.5" cy="10.5" r="6.5" />
               <path d="M20 20l-4.7-4.7" strokeLinecap="round" />

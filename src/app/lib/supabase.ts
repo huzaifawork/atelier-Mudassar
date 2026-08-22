@@ -58,7 +58,7 @@ export interface ArtworkRow {
   description: string;
   image: string;
   dimensions: string | null;
-  status: string;
+  status: string | null;
   youtube_url: string | null;
   details: string[] | null;
   sort_order: number;

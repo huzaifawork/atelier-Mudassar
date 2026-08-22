@@ -17,8 +17,8 @@ create table if not exists public.artworks (
   -- the private `artworks` bucket. Served to browsers via /api/gallery/image.
   image       text not null,
   dimensions  text,
-  status      text not null default 'completed'
-                check (status in ('completed', 'in-progress')),
+  status      text
+                check (status is null or status = 'in-progress'),
   youtube_url text,
   details     text[] not null default '{}',
   sort_order  integer not null default 0,
@@ -27,6 +27,17 @@ create table if not exists public.artworks (
 );
 
 create index if not exists artworks_sort_order_idx on public.artworks (sort_order, created_at desc);
+
+-- Status is now optional with only 'in-progress' as a meaningful value —
+-- 'completed' was retired, so existing rows are migrated to no status at all.
+-- These ALTERs are no-ops against a table already created with the definition
+-- above, and safe to re-run.
+alter table public.artworks alter column status drop default;
+alter table public.artworks alter column status drop not null;
+alter table public.artworks drop constraint if exists artworks_status_check;
+alter table public.artworks add constraint artworks_status_check
+  check (status is null or status = 'in-progress');
+update public.artworks set status = null where status = 'completed';
 
 -- ---------------------------------------------------------------------------
 -- Section-level copy that used to be hardcoded in Gallery.tsx

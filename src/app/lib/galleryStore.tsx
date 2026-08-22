@@ -29,7 +29,7 @@ interface GalleryContextValue {
   addItem: (draft: ArtworkDraft) => Promise<Artwork>;
   updateItem: (id: string, draft: Partial<ArtworkDraft>) => Promise<Artwork>;
   deleteItem: (id: string) => Promise<void>;
-  setStatus: (id: string, status: ArtworkStatus) => Promise<void>;
+  setStatus: (id: string, status: ArtworkStatus | undefined) => Promise<void>;
   reorderItem: (id: string, direction: -1 | 1) => Promise<void>;
   updateSettings: (next: GallerySettings) => Promise<void>;
   seedDemoItems: () => Promise<number>;
@@ -155,7 +155,15 @@ export function GalleryProvider({
       const response = await fetch(`/api/gallery/items/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
+        // A field explicitly set to `undefined` (e.g. "clear the YouTube
+        // link") means something different from a field never mentioned at
+        // all (leave it alone). JSON.stringify normally can't tell those
+        // apart — both drop the key — so map undefined to null here, which
+        // *does* survive serialization, and the PATCH route treats an
+        // explicit null as "clear this field".
+        body: JSON.stringify(draft, (_key, value) =>
+          value === undefined ? null : value,
+        ),
       });
       if (!response.ok) {
         throw new Error(await readError(response, "Could not update artwork"));
@@ -180,7 +188,7 @@ export function GalleryProvider({
   }, []);
 
   const setStatus = useCallback(
-    async (id: string, status: ArtworkStatus) => {
+    async (id: string, status: ArtworkStatus | undefined) => {
       await updateItem(id, { status });
     },
     [updateItem],

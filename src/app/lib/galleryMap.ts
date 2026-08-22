@@ -35,7 +35,7 @@ export function rowToArtwork(row: ArtworkRow): Artwork {
     description: row.description,
     image: row.image,
     dimensions: row.dimensions ?? undefined,
-    status: row.status as ArtworkStatus,
+    status: (row.status as ArtworkStatus | null) ?? undefined,
     youtubeUrl: row.youtube_url ?? undefined,
     details: row.details && row.details.length > 0 ? row.details : undefined,
   };
@@ -52,7 +52,7 @@ export function draftToRow(draft: ArtworkDraft): Omit<ArtworkRow, "id" | "sort_o
     description: draft.description,
     image: draft.image,
     dimensions: draft.dimensions ?? null,
-    status: draft.status ?? "completed",
+    status: draft.status ?? null,
     youtube_url: draft.youtubeUrl ?? null,
     details: draft.details ?? [],
   };

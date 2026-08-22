@@ -45,7 +45,7 @@ function emptyDraft(): ArtworkDraft {
     description: "",
     image: "",
     dimensions: "",
-    status: "completed",
+    status: undefined,
     youtubeUrl: "",
     details: [],
   };
@@ -94,15 +94,8 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
       const url = URL.createObjectURL(file);
       setPendingFile(file);
       setLocalPreview(url);
-
-      // Read the real pixel size so the admin doesn't have to type it.
-      const probe = new window.Image();
-      probe.onload = () => {
-        set("dimensions", `${probe.naturalWidth} × ${probe.naturalHeight} px`);
-      };
-      probe.src = url;
     },
-    [localPreview, set],
+    [localPreview],
   );
 
   const clearImage = useCallback(() => {
@@ -310,15 +303,24 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
               <select
                 id="status"
                 className={input}
-                value={draft.status ?? "completed"}
-                onChange={(event) => set("status", event.target.value as ArtworkStatus)}
+                value={draft.status ?? ""}
+                onChange={(event) =>
+                  set(
+                    "status",
+                    event.target.value === ""
+                      ? undefined
+                      : (event.target.value as ArtworkStatus),
+                  )
+                }
               >
+                <option value="">No status</option>
                 {statusOrder.map((key) => (
                   <option key={key} value={key}>
                     {statusLabels[key]}
                   </option>
                 ))}
               </select>
+              <p className={hint}>Optional. Leave as &ldquo;No status&rdquo; to show no badge.</p>
             </div>
           </div>
 
@@ -332,7 +334,7 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
                 onChange={(event) => set("dimensions", event.target.value)}
                 placeholder="907 × 1215 px"
               />
-              <p className={hint}>Filled in automatically when you upload.</p>
+              <p className={hint}>Enter the artwork&rsquo;s dimensions yourself, e.g. 907 × 1215 px.</p>
             </div>
             <div>
               <label className={label} htmlFor="slug">Slug</label>
