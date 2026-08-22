@@ -31,13 +31,17 @@ create index if not exists artworks_sort_order_idx on public.artworks (sort_orde
 -- Status is now optional with only 'in-progress' as a meaningful value —
 -- 'completed' was retired, so existing rows are migrated to no status at all.
 -- These ALTERs are no-ops against a table already created with the definition
--- above, and safe to re-run.
+-- above, and safe to re-run. The data migration runs before the new
+-- constraint is added, since the constraint validates existing rows
+-- immediately and would otherwise reject any row that isn't null or
+-- 'in-progress' — matched broadly (not just literal 'completed') so any
+-- other leftover value can't make this ALTER fail the same way again.
 alter table public.artworks alter column status drop default;
 alter table public.artworks alter column status drop not null;
+update public.artworks set status = null where status is not null and status <> 'in-progress';
 alter table public.artworks drop constraint if exists artworks_status_check;
 alter table public.artworks add constraint artworks_status_check
   check (status is null or status = 'in-progress');
-update public.artworks set status = null where status = 'completed';
 
 -- ---------------------------------------------------------------------------
 -- Section-level copy that used to be hardcoded in Gallery.tsx
