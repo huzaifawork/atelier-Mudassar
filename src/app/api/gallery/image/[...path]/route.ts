@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { getServiceClient, ARTWORK_BUCKET } from "../../../../lib/supabase";
+import { ARTWORK_BUCKET } from "../../../../lib/supabase";
+import { serveBucketImage } from "../../../../lib/imageUpload";
 import { clientIp, rateLimit, tooManyRequests } from "../../../../lib/rateLimit";
 
 /**
@@ -20,36 +20,6 @@ export async function GET(
   const limited = rateLimit(`gallery-image:${clientIp(request)}`, 120, 60_000);
   if (!limited.ok) return tooManyRequests(limited.retryAfterSeconds);
 
-  const supabase = getServiceClient();
-  if (!supabase) {
-    return NextResponse.json(
-      { error: "Supabase is not configured" },
-      { status: 503 },
-    );
-  }
-
   const { path } = await params;
-  const objectPath = path.join("/");
-
-  // Reject traversal attempts outright rather than trusting the bucket API.
-  if (objectPath.includes("..")) {
-    return NextResponse.json({ error: "Invalid path" }, { status: 400 });
-  }
-
-  const { data, error } = await supabase.storage
-    .from(ARTWORK_BUCKET)
-    .download(objectPath);
-
-  if (error || !data) {
-    return NextResponse.json({ error: "Image not found" }, { status: 404 });
-  }
-
-  return new NextResponse(data, {
-    headers: {
-      "Content-Type": data.type || "image/png",
-      // Object names are UUIDs, so a stored image is immutable once written.
-      "Cache-Control": "public, max-age=31536000, immutable",
-      "Content-Disposition": "inline",
-    },
-  });
+  return serveBucketImage(path, ARTWORK_BUCKET);
 }

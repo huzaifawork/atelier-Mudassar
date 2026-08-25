@@ -63,3 +63,17 @@ export interface ArtworkRow {
   details: string[] | null;
   sort_order: number;
 }
+
+export const BLOG_BUCKET = "blog";
+
+/** Row shape as stored in Postgres (snake_case). */
+export interface BlogPostRow {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  body: string;
+  cover_image: string | null;
+  published: boolean;
+  published_at: string;
+}

@@ -119,3 +119,48 @@ drop trigger if exists artworks_touch_updated_at on public.artworks;
 create trigger artworks_touch_updated_at
   before update on public.artworks
   for each row execute function public.touch_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- Blog posts (the "Journal")
+--
+-- Lives on its own /blog page — deliberately not part of the landing page.
+-- Only published posts are publicly readable; drafts stay admin-only, which is
+-- enforced by the RLS policy below rather than by the query that reads them.
+-- ---------------------------------------------------------------------------
+create table if not exists public.blog_posts (
+  id           uuid primary key default gen_random_uuid(),
+  slug         text not null unique,
+  title        text not null,
+  -- Short card summary. Optional: falls back to the opening of `body`.
+  excerpt      text not null default '',
+  -- The post itself, plain text. Blank lines separate paragraphs; rendered as
+  -- text nodes (never HTML), so nothing an admin types can inject markup.
+  body         text not null default '',
+  -- Optional. Null when the post has no cover; otherwise "storage:<path>"
+  -- into the private `blog` bucket, served via /api/blog/image.
+  cover_image  text,
+  published    boolean not null default true,
+  published_at timestamptz not null default now(),
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+
+create index if not exists blog_posts_published_at_idx
+  on public.blog_posts (published_at desc);
+
+alter table public.blog_posts enable row level security;
+
+drop policy if exists "published posts are publicly readable" on public.blog_posts;
+create policy "published posts are publicly readable"
+  on public.blog_posts for select using (published);
+
+drop trigger if exists blog_posts_touch_updated_at on public.blog_posts;
+create trigger blog_posts_touch_updated_at
+  before update on public.blog_posts
+  for each row execute function public.touch_updated_at();
+
+-- Private bucket for blog cover images, mirroring `artworks`. Browsers never
+-- see a Supabase URL; bytes are streamed through /api/blog/image.
+insert into storage.buckets (id, name, public)
+values ('blog', 'blog', false)
+on conflict (id) do nothing;
