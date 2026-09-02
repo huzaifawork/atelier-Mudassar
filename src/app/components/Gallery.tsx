@@ -79,11 +79,21 @@ function GalleryCard({
         alt={artwork.title}
         fit="contain"
         width={750}
-        quality={75}
+        // 90 rather than 75: the derivative is itself a WebP encode, so this
+        // is a second generation, and the seam shows in smooth gradients. The
+        // difference is 23 KB against 53 KB per card — worth it on a site
+        // whose whole purpose is the artwork.
+        quality={90}
         onNaturalSize={(w, h) => setRatio(w / h)}
       />
 
-      <div className="absolute inset-0 bg-linear-to-t from-ink via-ink/10 to-transparent opacity-70 group-hover:opacity-90 transition-opacity duration-500" />
+      {/* Legibility scrim for the title, confined to the bottom of the card
+          and only while hovered. This used to be a dark gradient across the
+          whole card at 70% opacity, which veiled every piece in the grid and
+          left the work looking flatter and less saturated than it is. Small
+          screens don't need it at all: the caption block below carries its
+          own gradient there, because it is always shown. */}
+      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-ink via-ink/30 to-transparent opacity-0 sm:group-hover:opacity-95 transition-opacity duration-500" />
 
       <div className="absolute top-4 left-4 right-4 flex items-start justify-between gap-2 z-10">
         {artwork.status && <StatusBadge status={artwork.status} />}
