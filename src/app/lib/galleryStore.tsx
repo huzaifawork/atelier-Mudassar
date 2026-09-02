@@ -16,7 +16,7 @@ import {
   type ArtworkStatus,
   type GallerySettings,
 } from "../data/artworks";
-import { assertUploadableImage } from "./imageFormats";
+import { assertUploadableImage, createDisplayImage } from "./imageFormats";
 
 interface GalleryContextValue {
   items: Artwork[];
@@ -48,25 +48,21 @@ async function readError(response: Response, fallback: string) {
 }
 
 /**
- * Uploads a file and returns the "storage:<path>" reference to save on the item.
+ * Puts one blob in the artworks bucket and returns its "storage:<path>" ref.
  *
  * The bytes go straight from this browser to Supabase Storage, not through
  * /api/gallery/upload. That route runs as a Vercel function, and a Vercel
  * function's request body is capped at 4.5 MB — the platform answers anything
  * larger with a bare 413 before our handler ever runs, which is what used to
  * make every real artwork export fail with a generic "Upload failed". So the
- * route now only signs the upload and checks it afterwards; the transfer
- * itself bypasses it entirely.
+ * route only signs the upload and checks it afterwards; the transfer itself
+ * bypasses it entirely.
  */
-export async function uploadArtworkImage(file: File): Promise<string> {
-  // Cheap local checks first, so an unusable file is rejected with a specific
-  // reason before a single byte goes over the wire.
-  await assertUploadableImage(file);
-
+async function putInBucket(body: Blob, contentType: string): Promise<string> {
   const signed = await fetch("/api/gallery/upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contentType: file.type, size: file.size }),
+    body: JSON.stringify({ contentType, size: body.size }),
   });
   if (!signed.ok) {
     throw new Error(await readError(signed, "Upload failed"));
@@ -91,8 +87,8 @@ export async function uploadArtworkImage(file: File): Promise<string> {
     auth: { persistSession: false },
   }).storage.from(bucket);
 
-  const { error } = await storage.uploadToSignedUrl(path, token, file, {
-    contentType: file.type,
+  const { error } = await storage.uploadToSignedUrl(path, token, body, {
+    contentType,
     upsert: false,
   });
   if (error) {
@@ -105,7 +101,7 @@ export async function uploadArtworkImage(file: File): Promise<string> {
   const verified = await fetch("/api/gallery/upload", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image, contentType: file.type }),
+    body: JSON.stringify({ image, contentType }),
   });
   if (!verified.ok) {
     void deleteUnusedArtworkImage(image);
@@ -113,6 +109,39 @@ export async function uploadArtworkImage(file: File): Promise<string> {
   }
 
   return image;
+}
+
+/**
+ * Uploads an artwork: the original, plus the web-sized copy visitors get.
+ *
+ * Both are stored. `image` is the untouched export and stays the artist's
+ * master; `displayImage` is what the site renders. Without the second one the
+ * image optimizer has to pull a full 40-to-140-megapixel export through a
+ * function every time it needs a size it hasn't cached — which is what made
+ * the gallery slow to paint.
+ *
+ * The derivative is best-effort. If the browser can't decode the file (a very
+ * large export can exhaust memory) or the encode gains nothing, it is simply
+ * omitted and the original is served: slower for that one piece, never broken.
+ */
+export async function uploadArtworkImage(
+  file: File,
+): Promise<{ image: string; displayImage?: string }> {
+  // Cheap local checks first, so an unusable file is rejected with a specific
+  // reason before a single byte goes over the wire.
+  await assertUploadableImage(file);
+
+  const image = await putInBucket(file, file.type);
+
+  let displayImage: string | undefined;
+  try {
+    const display = await createDisplayImage(file);
+    if (display) displayImage = await putInBucket(display, "image/webp");
+  } catch {
+    displayImage = undefined;
+  }
+
+  return { image, displayImage };
 }
 
 /** Best-effort cleanup for an upload that was never attached to a saved artwork. */

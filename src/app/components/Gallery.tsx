@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { categoryLabels, type Artwork, type Category } from "../data/artworks";
 import { useGallery } from "../lib/galleryStore";
-import { DEFAULT_RATIO, ratioOf } from "../lib/galleryMap";
+import { DEFAULT_RATIO, displayRefFor, ratioOf } from "../lib/galleryMap";
 import ProtectedImage from "./gallery/ProtectedImage";
 import StatusBadge from "./gallery/StatusBadge";
 import Lightbox from "./gallery/Lightbox";
@@ -61,7 +61,10 @@ function GalleryCard({
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ duration: 0.5, delay: index * 0.04 }}
+      // Capped: the stagger is a flourish for the handful of cards entering
+      // at once, and an uncapped index * 0.04 would leave the 300th artwork
+      // invisible for twelve seconds.
+      transition={{ duration: 0.5, delay: Math.min(index, 8) * 0.04 }}
       onClick={onOpen}
       onContextMenu={(e) => e.preventDefault()}
       onDragStart={(e) => e.preventDefault()}
@@ -72,7 +75,7 @@ function GalleryCard({
           it just guarantees the whole piece stays visible if a recorded size
           is ever slightly out of step with the file. */}
       <ProtectedImage
-        src={artwork.image}
+        src={displayRefFor(artwork)}
         alt={artwork.title}
         fit="contain"
         width={750}
@@ -123,15 +126,54 @@ function GalleryCard({
   );
 }
 
+/** Cards rendered per batch. More are appended as the visitor nears the end. */
+const BATCH = 12;
+
 export default function Gallery() {
   const { items, settings } = useGallery();
   const [filter, setFilter] = useState<Filter>("all");
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [shown, setShown] = useState(BATCH);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const visible = useMemo(
     () => (filter === "all" ? items : items.filter((a) => a.category === filter)),
     [filter, items],
   );
+
+  // Only a batch is mounted at a time. Each card carries an IntersectionObserver,
+  // a canvas and a motion component, so a collection of several hundred would
+  // otherwise cost that much work up front — before a single pixel of artwork
+  // has been fetched. The lightbox still walks the full filtered list, so
+  // paging the DOM doesn't shorten what prev/next can reach.
+  const rendered = useMemo(() => visible.slice(0, shown), [visible, shown]);
+  const hasMore = shown < visible.length;
+
+  // Start again at one batch whenever the filter changes the list underneath.
+  // Adjusted during render (React's documented pattern for deriving state from
+  // a prop change, and what Lightbox does for the same reason) rather than in
+  // an effect, which would render one frame of the old count first.
+  const [batchedFilter, setBatchedFilter] = useState(filter);
+  if (filter !== batchedFilter) {
+    setBatchedFilter(filter);
+    setShown(BATCH);
+  }
+
+  useEffect(() => {
+    if (!hasMore) return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) setShown((count) => count + BATCH);
+      },
+      // Well ahead of the viewport, so the next batch is mounted and its
+      // images are already fetching by the time they are scrolled to.
+      { rootMargin: "1200px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore]);
 
   const active = activeIndex !== null ? visible[activeIndex] : null;
 
@@ -213,7 +255,7 @@ export default function Gallery() {
               a gap under every short one. Columns close those up. */}
           <div className="columns-1 sm:columns-2 lg:columns-3 gap-5 sm:gap-6 lg:gap-8">
             <AnimatePresence>
-              {visible.map((art, i) => (
+              {rendered.map((art, i) => (
                 <GalleryCard
                   key={art.slug}
                   artwork={art}
@@ -223,6 +265,14 @@ export default function Gallery() {
               ))}
             </AnimatePresence>
           </div>
+
+          {hasMore && (
+            <div
+              ref={sentinelRef}
+              aria-hidden
+              className="h-px w-full"
+            />
+          )}
         </div>
 
         <AnimatePresence>

@@ -28,6 +28,11 @@ export interface Artwork {
    *  were recorded; see ratioOf() in lib/galleryMap.ts for the fallbacks. */
   imageWidth?: number;
   imageHeight?: number;
+  /** Web-sized WebP derived from `image`, and what visitors are actually
+   *  served. `image` stays the untouched original. Absent when none has been
+   *  generated yet, in which case the original is served instead — correct,
+   *  just far slower. Resolve with displaySrcFor() in lib/galleryMap.ts. */
+  displayImage?: string;
   status?: ArtworkStatus;
   /** Optional related process/showcase video. Only rendered when present. */
   youtubeUrl?: string;

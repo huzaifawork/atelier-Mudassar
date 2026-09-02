@@ -11,7 +11,7 @@ import {
   type ArtworkStatus,
 } from "../../data/artworks";
 import { useGallery } from "../../lib/galleryStore";
-import { DEFAULT_RATIO, imageSrcFor, ratioOf } from "../../lib/galleryMap";
+import { DEFAULT_RATIO, displaySrcFor, ratioOf } from "../../lib/galleryMap";
 import StatusBadge from "../../components/gallery/StatusBadge";
 import PreviewModal from "./PreviewModal";
 import SettingsPanel from "./SettingsPanel";
@@ -122,7 +122,7 @@ export default function AdminGalleryPage() {
                   original — keeps this list fast even with many large
                   admin-uploaded images. */}
               <Image
-                src={imageSrcFor(item.image)}
+                src={displaySrcFor(item)}
                 alt=""
                 width={96}
                 height={128}

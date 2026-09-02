@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import type { Artwork } from "../../data/artworks";
 import { categoryLabels } from "../../data/artworks";
-import { DEFAULT_RATIO, ratioOf } from "../../lib/galleryMap";
+import { DEFAULT_RATIO, displayRefFor, ratioOf } from "../../lib/galleryMap";
 import ProtectedImage from "./ProtectedImage";
 import StatusBadge from "./StatusBadge";
 import YouTubeEmbed from "./YouTubeEmbed";
@@ -178,7 +178,7 @@ export default function Lightbox({
               onDragStart={(e) => e.preventDefault()}
             >
               <ProtectedImage
-                src={artwork.image}
+                src={displayRefFor(artwork)}
                 alt={artwork.title}
                 magnify
                 fit="contain"

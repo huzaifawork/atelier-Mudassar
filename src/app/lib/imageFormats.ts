@@ -83,6 +83,71 @@ export async function assertUploadableImage(file: File): Promise<void> {
   }
 }
 
+/** Longest edge of the web-sized derivative. Deliberately above the 1920px
+ *  the lightbox asks for, so downsizing to it is never visible. */
+export const DISPLAY_MAX_EDGE = 2560;
+const DISPLAY_QUALITY = 0.9;
+/** An original already at web scale and this small isn't worth re-encoding. */
+const DISPLAY_SKIP_BYTES = 1_500_000;
+
+/**
+ * Builds the web-sized WebP that visitors are actually served.
+ *
+ * The originals here are full-resolution exports — 40 to 140 megapixels, up
+ * to 22 MB. Serving those means the image optimizer pulls an entire export
+ * through a function every time it needs a size it hasn't cached, just to
+ * emit a 24 KB thumbnail. Encoding a ~2560px copy once, here in the browser
+ * where the file already is, makes every later step cheap.
+ *
+ * The original is uploaded too and stays the artist's master; this only
+ * changes what gets sent to a browser, and at 2560px that is larger than any
+ * size the site requests.
+ *
+ * Returns null when there is nothing worth doing (already small) or when the
+ * browser can't decode the file — a very large export can exhaust memory.
+ * Callers fall back to serving the original: slower, never broken.
+ */
+export async function createDisplayImage(file: File): Promise<Blob | null> {
+  if (typeof createImageBitmap !== "function") return null;
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    return null;
+  }
+
+  try {
+    const longest = Math.max(bitmap.width, bitmap.height);
+    const scale = Math.min(1, DISPLAY_MAX_EDGE / longest);
+    if (scale === 1 && file.size <= DISPLAY_SKIP_BYTES) return null;
+
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(bitmap, 0, 0, width, height);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/webp", DISPLAY_QUALITY);
+    });
+
+    // Nothing gained if the re-encode came out no smaller than the original.
+    if (!blob || blob.size >= file.size) return null;
+    return blob;
+  } catch {
+    return null;
+  } finally {
+    bitmap.close();
+  }
+}
+
 /**
  * The picked file's real pixel size, decoded in the browser.
  *

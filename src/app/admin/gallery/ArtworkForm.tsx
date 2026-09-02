@@ -14,7 +14,7 @@ import {
   type Category,
 } from "../../data/artworks";
 import { useGallery, uploadArtworkImage, deleteUnusedArtworkImage } from "../../lib/galleryStore";
-import { DEFAULT_RATIO, imageSrcFor, ratioOf } from "../../lib/galleryMap";
+import { DEFAULT_RATIO, displaySrcFor, ratioOf } from "../../lib/galleryMap";
 import { assertUploadableImage, readImageSize } from "../../lib/imageFormats";
 import { extractVideoId, thumbnailFor } from "../../lib/youtube";
 import PreviewModal from "./PreviewModal";
@@ -134,6 +134,7 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
     setDraft((current) => ({
       ...current,
       image: "",
+      displayImage: undefined,
       dimensions: "",
       imageWidth: undefined,
       imageHeight: undefined,
@@ -143,7 +144,7 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
 
   const videoId = draft.youtubeUrl ? extractVideoId(draft.youtubeUrl) : null;
   const videoInvalid = Boolean(draft.youtubeUrl?.trim()) && !videoId;
-  const shownImage = localPreview ?? (draft.image ? imageSrcFor(draft.image) : null);
+  const shownImage = localPreview ?? (draft.image ? displaySrcFor(draft) : null);
 
   // Everything the preview needs, including the not-yet-uploaded local file.
   const previewArtwork: Artwork = {
@@ -171,17 +172,24 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
     if (clash) return setError(`"${clash.title}" already uses that slug.`);
 
     setSaving(true);
-    let freshlyUploaded: string | null = null;
+    const freshlyUploaded: string[] = [];
     try {
       let image = draft.image;
+      let displayImage = draft.displayImage;
       if (pendingFile) {
-        image = await uploadArtworkImage(pendingFile);
-        freshlyUploaded = image;
+        // Two objects now: the untouched original, and the web-sized copy the
+        // site actually serves. Both need cleaning up if the save then fails.
+        const uploaded = await uploadArtworkImage(pendingFile);
+        image = uploaded.image;
+        displayImage = uploaded.displayImage;
+        freshlyUploaded.push(uploaded.image);
+        if (uploaded.displayImage) freshlyUploaded.push(uploaded.displayImage);
       }
 
       const payload: ArtworkDraft = {
         ...draft,
         image,
+        displayImage,
         slug: slug.trim(),
         title: draft.title.trim(),
         medium: draft.medium.trim() || "Digital Painting",
@@ -198,7 +206,7 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
       // The image upload itself succeeded but the save referencing it
       // (e.g. a slug conflict) didn't — remove the now-orphaned object
       // rather than leaving it in the bucket with nothing pointing at it.
-      if (freshlyUploaded) void deleteUnusedArtworkImage(freshlyUploaded);
+      for (const orphan of freshlyUploaded) void deleteUnusedArtworkImage(orphan);
       setError(cause instanceof Error ? cause.message : "Could not save.");
       setSaving(false);
     }

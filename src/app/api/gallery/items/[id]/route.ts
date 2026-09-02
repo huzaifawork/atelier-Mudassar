@@ -59,6 +59,7 @@ export async function PATCH(
   const current = rowToArtwork(existing as ArtworkRow);
   const merged: ArtworkDraft = { ...current, ...body };
   const previousImage = current.image;
+  const previousDisplayImage = current.displayImage;
 
   const { data, error } = await supabase
     .from("artworks")
@@ -86,16 +87,20 @@ export async function PATCH(
     );
   }
 
-  // The replaced file is now unreferenced — drop it so storage doesn't grow
-  // by one orphan every time the admin swaps an image.
-  if (
-    isStoredImage(previousImage) &&
-    previousImage !== merged.image &&
-    supabase
-  ) {
-    await supabase.storage
-      .from(ARTWORK_BUCKET)
-      .remove([storagePath(previousImage)]);
+  // The replaced files are now unreferenced — drop them so storage doesn't
+  // grow by an orphan every time the admin swaps an image. Two objects per
+  // artwork since the web-sized derivative arrived, and the derivative can
+  // change while the original doesn't (or vice versa), so each is compared
+  // on its own rather than assuming they move together.
+  const replaced = [
+    [previousImage, merged.image],
+    [previousDisplayImage, merged.displayImage],
+  ]
+    .filter(([before, after]) => before && isStoredImage(before) && before !== after)
+    .map(([before]) => storagePath(before as string));
+
+  if (replaced.length > 0) {
+    await supabase.storage.from(ARTWORK_BUCKET).remove(replaced);
   }
 
   return NextResponse.json({ item: rowToArtwork(data as ArtworkRow) });
@@ -115,7 +120,7 @@ export async function DELETE(
 
   const { data: existing } = await supabase
     .from("artworks")
-    .select("image")
+    .select("image,display_image")
     .eq("id", id)
     .maybeSingle();
 
@@ -125,9 +130,12 @@ export async function DELETE(
     return NextResponse.json({ error: "Could not delete the artwork." }, { status: 500 });
   }
 
-  const image = (existing as { image?: string } | null)?.image;
-  if (image && isStoredImage(image)) {
-    await supabase.storage.from(ARTWORK_BUCKET).remove([storagePath(image)]);
+  const row = existing as { image?: string; display_image?: string } | null;
+  const orphans = [row?.image, row?.display_image]
+    .filter((ref): ref is string => Boolean(ref) && isStoredImage(ref!))
+    .map(storagePath);
+  if (orphans.length > 0) {
+    await supabase.storage.from(ARTWORK_BUCKET).remove(orphans);
   }
 
   return NextResponse.json({ ok: true });

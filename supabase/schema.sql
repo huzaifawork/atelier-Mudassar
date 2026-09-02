@@ -52,6 +52,22 @@ alter table public.artworks add constraint artworks_status_check
 alter table public.artworks add column if not exists image_width  integer;
 alter table public.artworks add column if not exists image_height integer;
 
+-- A web-sized WebP of the artwork, written alongside the original when it is
+-- uploaded. `image` still points at the untouched original and is what the
+-- artist's master copy remains; this is purely what visitors are served.
+--
+-- Worth the extra column because the originals are full-resolution exports —
+-- 40 to 140 megapixels, up to 22 MB — and the image optimizer has to pull one
+-- in its entirety every time it needs a size it hasn't cached, just to emit a
+-- 24 KB thumbnail. Serving a ~2560px derivative instead makes that pull two
+-- orders of magnitude cheaper, and is still larger than the biggest size the
+-- site ever asks for, so nothing visible changes.
+--
+-- Null means no derivative exists (older rows, or one that failed to encode);
+-- the site falls back to the original, which is slower but correct. Run
+-- scripts/backfill-display-images.mjs to fill these in.
+alter table public.artworks add column if not exists display_image text;
+
 -- ---------------------------------------------------------------------------
 -- Section-level copy that used to be hardcoded in Gallery.tsx
 -- ---------------------------------------------------------------------------

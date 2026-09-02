@@ -58,6 +58,26 @@ export function ratioOf(
   return parseRatio(artwork.dimensions);
 }
 
+/**
+ * The reference the site should actually render.
+ *
+ * Prefers the web-sized derivative and falls back to the original, so a piece
+ * with no derivative yet still displays — just at the cost of pulling a
+ * full-resolution export through the optimizer.
+ */
+export function displayRefFor(
+  artwork: Pick<Artwork, "image" | "displayImage">,
+): string {
+  return artwork.displayImage?.trim() || artwork.image;
+}
+
+/** Browser-facing URL for whichever of the two the site should show. */
+export function displaySrcFor(
+  artwork: Pick<Artwork, "image" | "displayImage">,
+): string {
+  return imageSrcFor(displayRefFor(artwork));
+}
+
 export function rowToArtwork(row: ArtworkRow): Artwork {
   return {
     id: row.id,
@@ -71,6 +91,7 @@ export function rowToArtwork(row: ArtworkRow): Artwork {
     dimensions: row.dimensions ?? undefined,
     imageWidth: row.image_width ?? undefined,
     imageHeight: row.image_height ?? undefined,
+    displayImage: row.display_image ?? undefined,
     status: (row.status as ArtworkStatus | null) ?? undefined,
     youtubeUrl: row.youtube_url ?? undefined,
     details: row.details && row.details.length > 0 ? row.details : undefined,
@@ -90,6 +111,7 @@ export function draftToRow(draft: ArtworkDraft): Omit<ArtworkRow, "id" | "sort_o
     dimensions: draft.dimensions ?? null,
     image_width: draft.imageWidth ?? null,
     image_height: draft.imageHeight ?? null,
+    display_image: draft.displayImage ?? null,
     status: draft.status ?? null,
     youtube_url: draft.youtubeUrl ?? null,
     details: draft.details ?? [],
