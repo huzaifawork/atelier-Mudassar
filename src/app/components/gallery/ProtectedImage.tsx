@@ -8,37 +8,38 @@ const MAX_DPR = 2;
 const LENS_SIZE = 240;
 const ZOOM = 2.3;
 
-function drawCover(
-  ctx: CanvasRenderingContext2D,
-  img: CanvasImageSource,
-  imgW: number,
-  imgH: number,
-  cw: number,
-  ch: number,
-) {
-  const scale = Math.max(cw / imgW, ch / imgH);
-  const sw = cw / scale;
-  const sh = ch / scale;
-  const sx = (imgW - sw) / 2;
-  const sy = (imgH - sh) / 2;
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
+interface Placement {
+  /** Source pixels -> CSS pixels. containerX = sourceX * scale + offsetX. */
+  scale: number;
+  offsetX: number;
+  offsetY: number;
 }
 
-/** Fits the whole image inside the canvas without cropping, like `object-fit: contain`. */
-function drawContain(
-  ctx: CanvasRenderingContext2D,
-  img: CanvasImageSource,
+/**
+ * Where the image sits on the canvas.
+ *
+ * "contain" fits the whole image inside the box; "cover" fills it and lets the
+ * overflow clip. Both are the same arithmetic with min/max swapped, and both
+ * are kept as an explicit mapping rather than a bare drawImage call because
+ * the magnifier has to invert it — turning a cursor position back into a
+ * coordinate in the source image.
+ */
+function placementFor(
+  fit: "cover" | "contain",
   imgW: number,
   imgH: number,
   cw: number,
   ch: number,
-) {
-  const scale = Math.min(cw / imgW, ch / imgH);
-  const dw = imgW * scale;
-  const dh = imgH * scale;
-  const dx = (cw - dw) / 2;
-  const dy = (ch - dh) / 2;
-  ctx.drawImage(img, 0, 0, imgW, imgH, dx, dy, dw, dh);
+): Placement {
+  const scale =
+    fit === "contain"
+      ? Math.min(cw / imgW, ch / imgH)
+      : Math.max(cw / imgW, ch / imgH);
+  return {
+    scale,
+    offsetX: (cw - imgW * scale) / 2,
+    offsetY: (ch - imgH * scale) / 2,
+  };
 }
 
 interface ProtectedImageProps {
@@ -81,6 +82,7 @@ export default function ProtectedImage({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lensCanvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const placementRef = useRef<Placement | null>(null);
   const onNaturalSizeRef = useRef(onNaturalSize);
   useEffect(() => {
     onNaturalSizeRef.current = onNaturalSize;
@@ -153,11 +155,30 @@ export default function ProtectedImage({
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cw, ch);
-    if (fit === "contain") {
-      drawContain(ctx, img, img.naturalWidth, img.naturalHeight, cw, ch);
-    } else {
-      drawCover(ctx, img, img.naturalWidth, img.naturalHeight, cw, ch);
-    }
+    // The source is several times the size of the box it lands in, and the
+    // default resampling gets visibly gritty at that ratio.
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+
+    const placement = placementFor(
+      fit,
+      img.naturalWidth,
+      img.naturalHeight,
+      cw,
+      ch,
+    );
+    // Kept for the magnifier, which needs to map the cursor back into the
+    // source image. "cover" draws past the edges of the canvas on purpose;
+    // the canvas clips it.
+    placementRef.current = placement;
+
+    ctx.drawImage(
+      img,
+      placement.offsetX,
+      placement.offsetY,
+      img.naturalWidth * placement.scale,
+      img.naturalHeight * placement.scale,
+    );
   }, [fit]);
 
   useEffect(() => {
@@ -187,11 +208,23 @@ export default function ProtectedImage({
     return () => observer.disconnect();
   }, [draw]);
 
+  /**
+   * Paints the magnifier.
+   *
+   * Samples the decoded image, not the on-screen canvas. Cropping the canvas
+   * was the whole problem with detail: that canvas only ever holds the image
+   * at the size it is displayed at, so enlarging a piece of it is enlarging
+   * pixels the browser had already thrown away — the lens could not show
+   * anything the naked eye couldn't already see, only a blurrier version of
+   * it. Going back to the source means the zoom reveals real detail, up to
+   * the full resolution of the image that was loaded.
+   */
   const updateLens = useCallback((clientX: number, clientY: number) => {
     const container = rootRef.current;
-    const baseCanvas = canvasRef.current;
     const lensCanvas = lensCanvasRef.current;
-    if (!container || !baseCanvas || !lensCanvas) return;
+    const img = imgRef.current;
+    const placement = placementRef.current;
+    if (!container || !lensCanvas || !img || !placement) return;
 
     const rect = container.getBoundingClientRect();
     const cx = clientX - rect.left;
@@ -215,30 +248,36 @@ export default function ProtectedImage({
     setLensSize(size);
 
     const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
-    const cropSize = (size / ZOOM) * dpr;
-    const px = cx * dpr;
-    const py = cy * dpr;
-    const sx = Math.min(
-      Math.max(px - cropSize / 2, 0),
-      Math.max(0, baseCanvas.width - cropSize),
-    );
-    const sy = Math.min(
-      Math.max(py - cropSize / 2, 0),
-      Math.max(0, baseCanvas.height - cropSize),
-    );
-
-    const targetSize = size * dpr;
+    const targetSize = Math.round(size * dpr);
     if (lensCanvas.width !== targetSize) lensCanvas.width = targetSize;
     if (lensCanvas.height !== targetSize) lensCanvas.height = targetSize;
     lensCanvas.style.width = `${size}px`;
     lensCanvas.style.height = `${size}px`;
 
+    // How much of the image the lens covers, converted from CSS pixels into
+    // source pixels through the same placement the canvas was drawn with.
+    const cropCss = size / ZOOM;
+    const crop = cropCss / placement.scale;
+    const cropSize = Math.min(crop, img.naturalWidth, img.naturalHeight);
+
+    const centerX = (cx - placement.offsetX) / placement.scale;
+    const centerY = (cy - placement.offsetY) / placement.scale;
+    const sx = Math.min(
+      Math.max(centerX - cropSize / 2, 0),
+      Math.max(0, img.naturalWidth - cropSize),
+    );
+    const sy = Math.min(
+      Math.max(centerY - cropSize / 2, 0),
+      Math.max(0, img.naturalHeight - cropSize),
+    );
+
     const lctx = lensCanvas.getContext("2d");
     if (!lctx) return;
     lctx.imageSmoothingEnabled = true;
+    lctx.imageSmoothingQuality = "high";
     lctx.clearRect(0, 0, targetSize, targetSize);
     lctx.drawImage(
-      baseCanvas,
+      img,
       sx,
       sy,
       Math.max(1, cropSize),
