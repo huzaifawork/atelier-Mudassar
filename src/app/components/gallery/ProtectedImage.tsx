@@ -88,6 +88,7 @@ export default function ProtectedImage({
     onNaturalSizeRef.current = onNaturalSize;
   }, [onNaturalSize]);
   const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [lensVisible, setLensVisible] = useState(false);
   const [lensPos, setLensPos] = useState({ x: 0, y: 0 });
   const [lensSize, setLensSize] = useState(LENS_SIZE);
@@ -116,6 +117,11 @@ export default function ProtectedImage({
     return props.src;
   }, [src, alt, width, quality]);
 
+  // The same image without the optimizer in front of it. If optimization
+  // fails for one file — and it can, for reasons specific to a single source
+  // — this still shows the artwork rather than an empty frame.
+  const rawSrc = useMemo(() => imageSrcFor(src), [src]);
+
   // Defer fetching until the card is actually near the viewport — without
   // this, every grid thumbnail fetches its full-size image the instant the
   // gallery mounts, regardless of scroll position.
@@ -129,7 +135,12 @@ export default function ProtectedImage({
           observer.disconnect();
         }
       },
-      { rootMargin: "200px" },
+      // Generous on purpose. This margin was set when a single thumbnail
+      // meant pulling a full-resolution export, so loading early was
+      // expensive; a card is ~50 KB now, and the cost of waiting is that a
+      // visitor scrolling to the gallery watches it fill in. Start well
+      // before they arrive instead.
+      { rootMargin: "1500px" },
     );
     observer.observe(container);
     return () => observer.disconnect();
@@ -181,24 +192,57 @@ export default function ProtectedImage({
     );
   }, [fit]);
 
+  /**
+   * Loads the image, falling back to the unoptimized source.
+   *
+   * There was no error handling here at all: a request that failed left the
+   * card blank forever, drew nothing, and said nothing — the artwork simply
+   * never appeared, with no clue as to why. Optimization can fail for one
+   * particular file while every other image on the page is fine, so a single
+   * missing piece is exactly the shape that failure takes.
+   */
   useEffect(() => {
     if (!shouldLoad || !optimizedSrc) return;
+
+    // Deduped: for a blob:/data: preview the two are the same URL, and there
+    // is no point asking for it twice.
+    const sources = [optimizedSrc, rawSrc].filter(
+      (source, index, all) => source && all.indexOf(source) === index,
+    );
+
     let cancelled = false;
-    const image = new window.Image();
-    image.decoding = "async";
-    image.onload = () => {
-      if (cancelled) return;
-      imgRef.current = image;
-      draw();
-      setReady(true);
-      onNaturalSizeRef.current?.(image.naturalWidth, image.naturalHeight);
+    let attempt = 0;
+
+    const load = () => {
+      const image = new window.Image();
+      image.decoding = "async";
+      image.onload = () => {
+        if (cancelled) return;
+        imgRef.current = image;
+        draw();
+        setReady(true);
+        setFailed(false);
+        onNaturalSizeRef.current?.(image.naturalWidth, image.naturalHeight);
+      };
+      image.onerror = () => {
+        if (cancelled) return;
+        console.error(
+          `ProtectedImage: could not load ${sources[attempt]}` +
+            (attempt + 1 < sources.length ? " — retrying unoptimized" : ""),
+        );
+        attempt += 1;
+        if (attempt < sources.length) load();
+        else setFailed(true);
+      };
+      image.src = sources[attempt];
     };
-    image.src = optimizedSrc;
+
+    load();
 
     return () => {
       cancelled = true;
     };
-  }, [shouldLoad, optimizedSrc, draw]);
+  }, [shouldLoad, optimizedSrc, rawSrc, draw]);
 
   useEffect(() => {
     const container = rootRef.current;
@@ -351,8 +395,15 @@ export default function ProtectedImage({
       onMouseLeave={magnify ? handleMouseLeave : undefined}
     >
       <div className="absolute inset-0 overflow-hidden">
-        {!ready && (
+        {!ready && !failed && (
           <div className="absolute inset-0 bg-espresso-light/60 animate-pulse" />
+        )}
+        {failed && (
+          <div className="absolute inset-0 flex items-center justify-center bg-espresso px-4 text-center">
+            <p className="text-cream-dim/60 text-xs tracking-[0.2em] uppercase">
+              Image unavailable
+            </p>
+          </div>
         )}
         <canvas
           ref={canvasRef}

@@ -69,7 +69,7 @@ function GalleryCard({
       onContextMenu={(e) => e.preventDefault()}
       onDragStart={(e) => e.preventDefault()}
       style={{ aspectRatio: ratio }}
-      className="group relative block w-full mb-5 sm:mb-6 lg:mb-8 break-inside-avoid overflow-hidden bg-espresso cursor-pointer text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-bright"
+      className="group relative block w-full overflow-hidden bg-espresso cursor-pointer text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-bright"
     >
       {/* The box is already the image's shape, so "contain" crops nothing —
           it just guarantees the whole piece stays visible if a recorded size
@@ -260,10 +260,15 @@ export default function Gallery() {
             ))}
           </div>
 
-          {/* Multi-column rather than a fixed grid: cards are each the
-              artwork's own shape now, so heights vary and a grid would leave
-              a gap under every short one. Columns close those up. */}
-          <div className="columns-1 sm:columns-2 lg:columns-3 gap-5 sm:gap-6 lg:gap-8">
+          {/* A plain grid, deliberately. Cards are each the artwork's own
+              shape now, so a multi-column masonry closes the gaps under the
+              shorter ones more neatly — but CSS columns fragment a child
+              across a column boundary when break-inside-avoid can't be
+              honoured, and a fragmented card ends up a sliver whose
+              IntersectionObserver never fires, so its artwork simply never
+              loads. Ragged row heights are a far better failure than a piece
+              that doesn't appear. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8 items-start">
             <AnimatePresence>
               {rendered.map((art, i) => (
                 <GalleryCard
