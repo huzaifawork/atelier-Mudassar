@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   categoryLabels,
   categoryOrder,
@@ -225,12 +226,29 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
             style={{ aspectRatio: ratioOf(draft) ?? DEFAULT_RATIO }}
           >
             {shownImage ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={shownImage}
-                alt="Selected artwork"
-                className="w-full h-full object-contain"
-              />
+              localPreview ? (
+                /* A blob: URL for a file that hasn't been uploaded yet — the
+                   optimizer can't fetch those, so it goes in as-is. */
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={shownImage}
+                  alt="Selected artwork"
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                /* Already stored, so let the optimizer size it. This box is
+                   about 320px wide; the stored file is a 2560px derivative,
+                   and loading that whole thing to fill a thumbnail is exactly
+                   what makes the admin feel slow. */
+                <Image
+                  src={shownImage}
+                  alt="Selected artwork"
+                  width={640}
+                  height={640}
+                  quality={75}
+                  className="w-full h-full object-contain"
+                />
+              )
             ) : (
               <p className="text-cream-dim/60 text-xs tracking-[0.2em] uppercase px-6 text-center">
                 No image selected
