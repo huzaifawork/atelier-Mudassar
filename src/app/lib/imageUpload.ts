@@ -279,13 +279,21 @@ export async function handleImageDelete(
  * Object names are unguessable UUIDs, so this isn't gating access — going
  * through our own route keeps the storage location unexposed and gives one
  * place to add auth later.
+ *
+ * The body is piped straight through rather than buffered. supabase-js's
+ * download() resolves a Blob, which means holding the whole object in the
+ * function's memory and sending nothing until the last byte has arrived — on
+ * a 20 MB artwork that is the slowest step in the whole pipeline, and it is
+ * paid again for every image-optimizer cache miss. Forwarding the upstream
+ * stream lets bytes start moving immediately and keeps memory flat whatever
+ * the file size.
  */
 export async function serveBucketImage(
   path: string[],
   bucket: string,
 ): Promise<Response> {
-  const supabase = getServiceClient();
-  if (!supabase) return noClient();
+  const rest = getStorageRest();
+  if (!rest) return noClient();
 
   const objectPath = path.join("/");
 
@@ -294,17 +302,26 @@ export async function serveBucketImage(
     return NextResponse.json({ error: "Invalid path" }, { status: 400 });
   }
 
-  const { data, error } = await supabase.storage.from(bucket).download(objectPath);
-  if (error || !data) {
+  const upstream = await fetch(`${rest.url}/object/${bucket}/${objectPath}`, {
+    headers: { apikey: rest.key, authorization: `Bearer ${rest.key}` },
+    cache: "no-store",
+  });
+
+  if (!upstream.ok || !upstream.body) {
     return NextResponse.json({ error: "Image not found" }, { status: 404 });
   }
 
-  return new NextResponse(data, {
-    headers: {
-      "Content-Type": data.type || "image/png",
-      // Object names are UUIDs, so a stored image is immutable once written.
-      "Cache-Control": "public, max-age=31536000, immutable",
-      "Content-Disposition": "inline",
-    },
+  const headers = new Headers({
+    "Content-Type": upstream.headers.get("content-type") || "image/png",
+    // Object names are UUIDs, so a stored image is immutable once written.
+    // The optimizer reads this too: its cache entry lives for the larger of
+    // this max-age and images.minimumCacheTTL, so a year here means an
+    // artwork is pulled out of the bucket once, not on a 4-hour cycle.
+    "Cache-Control": "public, max-age=31536000, immutable",
+    "Content-Disposition": "inline",
   });
+  const length = upstream.headers.get("content-length");
+  if (length) headers.set("Content-Length", length);
+
+  return new NextResponse(upstream.body, { headers });
 }

@@ -51,6 +51,20 @@ interface ProtectedImageProps {
   fit?: "cover" | "contain";
   /** Reports the decoded image's real pixel dimensions once known, for callers that size the box to match (avoids letterboxing). */
   onNaturalSize?: (width: number, height: number) => void;
+  /**
+   * Pixel width to ask the optimizer for, and the quality to encode at.
+   *
+   * Worth setting per use rather than leaving at one value for everything.
+   * The originals here are full-resolution exports — 20 MB and 9000 px across
+   * is normal — so what gets requested decides both the bytes on the wire and
+   * how much work the optimizer does. A grid card roughly 350 px wide wants a
+   * fraction of what the lightbox's magnifier wants, and asking for one size
+   * everywhere means either bloated thumbnails or a soft lightbox.
+   *
+   * `quality` must be one of images.qualities in next.config.ts.
+   */
+  width?: number;
+  quality?: number;
 }
 
 export default function ProtectedImage({
@@ -60,6 +74,8 @@ export default function ProtectedImage({
   magnify = false,
   fit = "cover",
   onNaturalSize,
+  width = 1080,
+  quality = 75,
 }: ProtectedImageProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -88,12 +104,15 @@ export default function ProtectedImage({
     const { props } = getImageProps({
       src: resolved,
       alt,
-      width: 950,
-      height: 1273,
-      quality: 90,
+      width,
+      // Only the width steers which optimized variant is picked; the height
+      // is required by the signature but never constrains the result, so it
+      // does not need to match the artwork's real shape.
+      height: width,
+      quality,
     });
     return props.src;
-  }, [src, alt]);
+  }, [src, alt, width, quality]);
 
   // Defer fetching until the card is actually near the viewport — without
   // this, every grid thumbnail fetches its full-size image the instant the

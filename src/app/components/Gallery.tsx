@@ -75,6 +75,8 @@ function GalleryCard({
         src={artwork.image}
         alt={artwork.title}
         fit="contain"
+        width={750}
+        quality={75}
         onNaturalSize={(w, h) => setRatio(w / h)}
       />
 

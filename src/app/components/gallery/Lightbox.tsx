@@ -182,6 +182,8 @@ export default function Lightbox({
                 alt={artwork.title}
                 magnify
                 fit="contain"
+                width={1920}
+                quality={90}
                 onNaturalSize={(w, h) => setRatio(w / h)}
               />
               {artwork.status && (
