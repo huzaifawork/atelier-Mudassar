@@ -104,6 +104,21 @@ insert into storage.buckets (id, name, public)
 values ('artworks', 'artworks', false)
 on conflict (id) do nothing;
 
+-- Artwork is uploaded straight from the admin's browser on a signed URL, so
+-- the app's own function never sees the bytes and can't measure or sniff them
+-- on the way past. (It can't take the upload itself: a Vercel function's
+-- request body is capped at 4.5 MB, well under a full-resolution export, and
+-- the platform rejects anything larger with a 413.) These two limits are
+-- therefore the real enforcement of "25 MB, and only these four formats" —
+-- Supabase applies them when the bytes arrive, whatever the client claimed.
+-- The magic-byte check still happens, just afterwards: see handleUploadVerify.
+update storage.buckets
+set file_size_limit = 26214400,  -- 25 MB, matching MAX_BYTES in lib/imageFormats.ts
+    allowed_mime_types = array[
+      'image/png', 'image/jpeg', 'image/webp', 'image/avif'
+    ]
+where id = 'artworks';
+
 -- ---------------------------------------------------------------------------
 -- Keep updated_at honest
 -- ---------------------------------------------------------------------------

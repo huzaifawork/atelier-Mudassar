@@ -35,6 +35,19 @@ export function getServiceClient(): SupabaseClient | null {
   });
 }
 
+/**
+ * Raw Storage REST base + service key, for the one operation supabase-js
+ * doesn't expose: reading only the first few bytes of an object with a Range
+ * header. `download()` would pull the whole file, which for a 25 MB artwork is
+ * a lot of bandwidth to spend confirming twelve bytes.
+ *
+ * SERVER ONLY, for the same reason as getServiceClient().
+ */
+export function getStorageRest(): { url: string; key: string } | null {
+  if (!url || !serviceRoleKey) return null;
+  return { url: `${url}/storage/v1`, key: serviceRoleKey };
+}
+
 /** Row shape as stored in Postgres (snake_case). */
 export interface ContactMessageRow {
   id: string;

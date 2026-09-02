@@ -14,6 +14,21 @@ import type { NextConfig } from "next";
 // the policy for that local case; the deployed app keeps the strict one.
 const isDev = process.env.NODE_ENV !== "production";
 
+// The admin uploader sends artwork straight from the browser to Supabase
+// Storage on a signed URL — routing it through our own function instead would
+// hit Vercel's 4.5 MB request-body cap and fail with a 413. That's the one
+// cross-origin request the app makes, so connect-src has to name it. Just the
+// origin, never a key: what the browser holds is a short-lived upload token.
+let supabaseOrigin = "";
+try {
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    supabaseOrigin = ` ${new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin}`;
+  }
+} catch {
+  // Malformed URL — leave connect-src at 'self' rather than emitting a broken
+  // policy. Uploads then fail loudly in the console, which is the right signal.
+}
+
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
@@ -23,7 +38,7 @@ const CONTENT_SECURITY_POLICY = [
   "img-src 'self' data: blob: https://i.ytimg.com",
   "font-src 'self'",
   "frame-src 'self' https://www.youtube-nocookie.com",
-  "connect-src 'self'",
+  `connect-src 'self'${supabaseOrigin}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

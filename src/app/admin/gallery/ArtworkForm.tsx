@@ -15,6 +15,7 @@ import {
 } from "../../data/artworks";
 import { useGallery, uploadArtworkImage, deleteUnusedArtworkImage } from "../../lib/galleryStore";
 import { imageSrcFor } from "../../lib/galleryMap";
+import { assertUploadableImage } from "../../lib/imageFormats";
 import { extractVideoId, thumbnailFor } from "../../lib/youtube";
 import PreviewModal from "./PreviewModal";
 
@@ -86,9 +87,21 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
   }, [localPreview]);
 
   const onPickFile = useCallback(
-    (file: File | null) => {
+    async (file: File | null) => {
       if (!file) return;
       setError(null);
+
+      // Check the file the moment it's chosen rather than on submit, so a
+      // wrong format or an oversized export is named right away instead of
+      // after the artist has filled the whole form in.
+      try {
+        await assertUploadableImage(file);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "That file can't be used.");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
       if (localPreview) URL.revokeObjectURL(localPreview);
 
       const url = URL.createObjectURL(file);
@@ -197,7 +210,7 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
             ref={fileInputRef}
             type="file"
             accept="image/png,image/jpeg,image/webp,image/avif"
-            onChange={(event) => onPickFile(event.target.files?.[0] ?? null)}
+            onChange={(event) => void onPickFile(event.target.files?.[0] ?? null)}
             className="sr-only"
             id="artwork-image"
           />

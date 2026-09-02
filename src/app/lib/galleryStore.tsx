@@ -16,6 +16,7 @@ import {
   type ArtworkStatus,
   type GallerySettings,
 } from "../data/artworks";
+import { assertUploadableImage } from "./imageFormats";
 
 interface GalleryContextValue {
   items: Artwork[];
@@ -46,18 +47,71 @@ async function readError(response: Response, fallback: string) {
   }
 }
 
-/** Uploads a file and returns the "storage:<path>" reference to save on the item. */
+/**
+ * Uploads a file and returns the "storage:<path>" reference to save on the item.
+ *
+ * The bytes go straight from this browser to Supabase Storage, not through
+ * /api/gallery/upload. That route runs as a Vercel function, and a Vercel
+ * function's request body is capped at 4.5 MB — the platform answers anything
+ * larger with a bare 413 before our handler ever runs, which is what used to
+ * make every real artwork export fail with a generic "Upload failed". So the
+ * route now only signs the upload and checks it afterwards; the transfer
+ * itself bypasses it entirely.
+ */
 export async function uploadArtworkImage(file: File): Promise<string> {
-  const form = new FormData();
-  form.append("file", file);
-  const response = await fetch("/api/gallery/upload", {
+  // Cheap local checks first, so an unusable file is rejected with a specific
+  // reason before a single byte goes over the wire.
+  await assertUploadableImage(file);
+
+  const signed = await fetch("/api/gallery/upload", {
     method: "POST",
-    body: form,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contentType: file.type, size: file.size }),
   });
-  if (!response.ok) {
-    throw new Error(await readError(response, "Upload failed"));
+  if (!signed.ok) {
+    throw new Error(await readError(signed, "Upload failed"));
   }
-  const { image } = (await response.json()) as { image: string };
+  const { bucket, path, token, image } = (await signed.json()) as {
+    bucket: string;
+    path: string;
+    token: string;
+    image: string;
+  };
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Uploads are not configured.");
+  }
+
+  // Imported on demand: this module is in the public gallery's bundle too, and
+  // only an admin picking a file ever needs the storage client.
+  const { createClient } = await import("@supabase/supabase-js");
+  const storage = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { persistSession: false },
+  }).storage.from(bucket);
+
+  const { error } = await storage.uploadToSignedUrl(path, token, file, {
+    contentType: file.type,
+    upsert: false,
+  });
+  if (error) {
+    throw new Error("Could not upload the image. Check your connection and try again.");
+  }
+
+  // The server never saw these bytes, so let it read the first few back and
+  // confirm the file is what it said it was. A failure here has already
+  // removed the object server-side; the extra cleanup covers the other cases.
+  const verified = await fetch("/api/gallery/upload", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image, contentType: file.type }),
+  });
+  if (!verified.ok) {
+    void deleteUnusedArtworkImage(image);
+    throw new Error(await readError(verified, "Upload failed"));
+  }
+
   return image;
 }
 

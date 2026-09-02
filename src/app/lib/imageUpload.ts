@@ -1,63 +1,43 @@
 import "server-only";
 import { NextResponse } from "next/server";
-import { getServiceClient } from "./supabase";
+import { getServiceClient, getStorageRest } from "./supabase";
 import { STORAGE_PREFIX, isStoredImage, storagePath } from "./galleryMap";
+import {
+  ALLOWED,
+  EXTENSIONS,
+  MAX_BYTES,
+  SIGNATURE_BYTES,
+  matchesSignature,
+} from "./imageFormats";
 
 /**
  * Shared upload/cleanup handling for the private image buckets.
  *
  * The gallery and the blog both accept admin-uploaded images, and the checks
  * that matter — size, declared type, and the actual magic bytes — must not be
- * allowed to drift apart between them, so they live here once.
+ * allowed to drift apart between them, so they live here once (in
+ * ./imageFormats, which the browser shares too).
+ *
+ * Two upload shapes live here:
+ *
+ *  - handleImageUpload() takes the file as multipart and writes it to the
+ *    bucket itself. Simple, but the whole file has to cross this function,
+ *    and a Vercel function's request body is capped at 4.5 MB — anything
+ *    bigger is rejected with a 413 by the platform before the handler runs.
+ *    Still used by the blog, whose covers are small.
+ *
+ *  - handleSignedUploadUrl() + handleUploadVerify() hand the browser a
+ *    short-lived signed URL and let it send the bytes straight to Supabase,
+ *    so nothing large touches this function at all. That is what the gallery
+ *    uses: a full-resolution artwork export is routinely past 4.5 MB.
  *
  * Callers are responsible for guardAdmin() before calling in; nothing in this
  * module authenticates.
  */
 
-const MAX_BYTES = 25 * 1024 * 1024; // 25 MB — comfortably above a large PNG export.
-const ALLOWED = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/avif",
-]);
-
-const EXTENSIONS: Record<string, string> = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-  "image/avif": "avif",
-};
-
-function startsWith(bytes: Uint8Array, signature: number[], offset = 0): boolean {
-  return signature.every((byte, index) => bytes[offset + index] === byte);
-}
-
-/** Verifies the leading bytes match the claimed image type. */
-function matchesSignature(bytes: Uint8Array, mime: string): boolean {
-  if (bytes.length < 12) return false;
-  switch (mime) {
-    case "image/png":
-      return startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    case "image/jpeg":
-      return startsWith(bytes, [0xff, 0xd8, 0xff]);
-    case "image/webp":
-      // "RIFF" .... "WEBP"
-      return (
-        startsWith(bytes, [0x52, 0x49, 0x46, 0x46]) &&
-        startsWith(bytes, [0x57, 0x45, 0x42, 0x50], 8)
-      );
-    case "image/avif":
-      // ISO-BMFF box: "ftyp" at offset 4, brand "avif"/"avis" at 8.
-      return (
-        startsWith(bytes, [0x66, 0x74, 0x79, 0x70], 4) &&
-        (startsWith(bytes, [0x61, 0x76, 0x69, 0x66], 8) ||
-          startsWith(bytes, [0x61, 0x76, 0x69, 0x73], 8))
-      );
-    default:
-      return false;
-  }
-}
+// Object names are generated here and nowhere else, so a path coming back
+// from the browser must still look exactly like one we minted.
+const OBJECT_PATH = /^[0-9a-f-]{36}\.(png|jpg|webp|avif)$/;
 
 function noClient() {
   return NextResponse.json(
@@ -130,6 +110,139 @@ export async function handleImageUpload(
   }
 
   return NextResponse.json({ image: `${STORAGE_PREFIX}${path}` }, { status: 201 });
+}
+
+/**
+ * Mints a short-lived signed upload URL so the browser can PUT the file
+ * straight to Supabase Storage, skipping this function entirely.
+ *
+ * Takes `{ contentType, size }` rather than the file, and answers with the
+ * `{ bucket, path, token }` the browser needs plus the `image` reference to
+ * save on the row once the upload lands.
+ *
+ * The path is chosen here, never by the caller: a random UUID, so there is no
+ * traversal, no collision and nothing guessable from outside — the same
+ * property the multipart handler above relies on. `contentType` and `size` are
+ * only what the client *claims*; Supabase re-checks both against the bucket's
+ * own allowed_mime_types and file_size_limit when the bytes actually arrive
+ * (see supabase/schema.sql), so a lie here buys nothing.
+ */
+export async function handleSignedUploadUrl(
+  request: Request,
+  bucket: string,
+): Promise<Response> {
+  const supabase = getServiceClient();
+  if (!supabase) return noClient();
+
+  let body: { contentType?: unknown; size?: unknown };
+  try {
+    body = (await request.json()) as { contentType?: unknown; size?: unknown };
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const contentType = typeof body.contentType === "string" ? body.contentType : "";
+  if (!ALLOWED.has(contentType)) {
+    return NextResponse.json(
+      { error: "Use a PNG, JPEG, WebP or AVIF image." },
+      { status: 415 },
+    );
+  }
+
+  const size = typeof body.size === "number" ? body.size : NaN;
+  if (!Number.isFinite(size) || size <= 0) {
+    return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  }
+  if (size > MAX_BYTES) {
+    return NextResponse.json(
+      { error: "That image is larger than 25 MB." },
+      { status: 413 },
+    );
+  }
+
+  const path = `${crypto.randomUUID()}.${EXTENSIONS[contentType] ?? "png"}`;
+
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUploadUrl(path);
+
+  if (error || !data) {
+    console.error(`signed upload url for ${bucket}:`, error);
+    return NextResponse.json(
+      { error: "Could not start the upload." },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json(
+    { bucket, path, token: data.token, image: `${STORAGE_PREFIX}${path}` },
+    { status: 201 },
+  );
+}
+
+/**
+ * Re-checks an object the browser uploaded directly, and deletes it if it
+ * isn't the format it was signed for.
+ *
+ * The multipart path gets to inspect the magic bytes on the way past; a direct
+ * upload doesn't, so this reads them back afterwards instead. It range-reads
+ * only the first few bytes rather than downloading the object, which keeps the
+ * check roughly free even for a 25 MB artwork.
+ */
+export async function handleUploadVerify(
+  request: Request,
+  bucket: string,
+): Promise<Response> {
+  const supabase = getServiceClient();
+  const rest = getStorageRest();
+  if (!supabase || !rest) return noClient();
+
+  let body: { image?: unknown; contentType?: unknown };
+  try {
+    body = (await request.json()) as { image?: unknown; contentType?: unknown };
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const image = typeof body.image === "string" ? body.image.trim() : "";
+  const contentType = typeof body.contentType === "string" ? body.contentType : "";
+  if (!isStoredImage(image)) {
+    return NextResponse.json({ error: "Not a stored image" }, { status: 400 });
+  }
+
+  const path = storagePath(image);
+  // Only ever look at a name this module could itself have generated, so the
+  // caller can't aim this read at some other object in the bucket.
+  if (!OBJECT_PATH.test(path)) {
+    return NextResponse.json({ error: "Not a stored image" }, { status: 400 });
+  }
+
+  const response = await fetch(`${rest.url}/object/${bucket}/${path}`, {
+    headers: {
+      apikey: rest.key,
+      authorization: `Bearer ${rest.key}`,
+      range: `bytes=0-${SIGNATURE_BYTES - 1}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return NextResponse.json(
+      { error: "That upload didn't finish. Try again." },
+      { status: 404 },
+    );
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (!matchesSignature(bytes, contentType)) {
+    await supabase.storage.from(bucket).remove([path]);
+    return NextResponse.json(
+      { error: "That file doesn't look like a valid image." },
+      { status: 415 },
+    );
+  }
+
+  return NextResponse.json({ ok: true });
 }
 
 /**
