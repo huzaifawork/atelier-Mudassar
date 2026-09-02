@@ -19,8 +19,15 @@ export interface Artwork {
    *  an admin-uploaded image in the private Supabase bucket. Resolved via
    *  imageSrcFor() in lib/galleryMap.ts. */
   image: string;
-  /** Intrinsic pixel dimensions of the source file, e.g. "907 × 1215 px". */
+  /** Intrinsic pixel dimensions of the source file, e.g. "907 × 1215 px".
+   *  Free text, shown to visitors — for layout use imageWidth/imageHeight. */
   dimensions?: string;
+  /** The source file's real pixel size, read from the file when it is picked.
+   *  The gallery reserves each card at this shape so the artwork is shown as
+   *  it is, whatever its orientation. Absent on artwork added before these
+   *  were recorded; see ratioOf() in lib/galleryMap.ts for the fallbacks. */
+  imageWidth?: number;
+  imageHeight?: number;
   status?: ArtworkStatus;
   /** Optional related process/showcase video. Only rendered when present. */
   youtubeUrl?: string;

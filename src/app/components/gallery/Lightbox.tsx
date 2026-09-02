@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import type { Artwork } from "../../data/artworks";
 import { categoryLabels } from "../../data/artworks";
+import { DEFAULT_RATIO, ratioOf } from "../../lib/galleryMap";
 import ProtectedImage from "./ProtectedImage";
 import StatusBadge from "./StatusBadge";
 import YouTubeEmbed from "./YouTubeEmbed";
@@ -13,20 +14,6 @@ interface LightboxProps {
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
-}
-
-const DEFAULT_RATIO = 4 / 5;
-
-/** Best-effort parse of an admin-entered "907 × 1215 px" string, used only
- *  as an initial guess before the real image loads and reports its own size. */
-function parseRatio(dimensions?: string): number | null {
-  if (!dimensions) return null;
-  const match = dimensions.match(/([\d.]+)\s*[×x]\s*([\d.]+)/i);
-  if (!match) return null;
-  const w = parseFloat(match[1]);
-  const h = parseFloat(match[2]);
-  if (!w || !h) return null;
-  return w / h;
 }
 
 /** Computes the largest box that fits `ratio` inside `slotRef`'s box, so the
@@ -68,7 +55,7 @@ export default function Lightbox({
   onNext,
 }: LightboxProps) {
   const [ratio, setRatio] = useState(
-    () => parseRatio(artwork.dimensions) ?? DEFAULT_RATIO,
+    () => ratioOf(artwork) ?? DEFAULT_RATIO,
   );
 
   // Reset to the best-effort guess whenever the artwork changes (Lightbox
@@ -79,7 +66,7 @@ export default function Lightbox({
   const [prevSlug, setPrevSlug] = useState(artwork.slug);
   if (artwork.slug !== prevSlug) {
     setPrevSlug(artwork.slug);
-    setRatio(parseRatio(artwork.dimensions) ?? DEFAULT_RATIO);
+    setRatio(ratioOf(artwork) ?? DEFAULT_RATIO);
   }
 
   const { slotRef, size } = useContainedFrame(ratio);

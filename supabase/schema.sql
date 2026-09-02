@@ -43,6 +43,15 @@ alter table public.artworks drop constraint if exists artworks_status_check;
 alter table public.artworks add constraint artworks_status_check
   check (status is null or status = 'in-progress');
 
+-- The source file's real pixel size, captured in the browser when the artwork
+-- is picked. The gallery reserves each card at the artwork's own shape from
+-- this, so a landscape or square piece is shown as it is rather than
+-- letterboxed inside a portrait box. Null on rows added before this existed —
+-- the grid falls back to the `dimensions` text, then to the image's decoded
+-- size once it loads.
+alter table public.artworks add column if not exists image_width  integer;
+alter table public.artworks add column if not exists image_height integer;
+
 -- ---------------------------------------------------------------------------
 -- Section-level copy that used to be hardcoded in Gallery.tsx
 -- ---------------------------------------------------------------------------

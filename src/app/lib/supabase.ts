@@ -48,6 +48,19 @@ export function getStorageRest(): { url: string; key: string } | null {
   return { url: `${url}/storage/v1`, key: serviceRoleKey };
 }
 
+/**
+ * True when Postgres rejected a write because a column doesn't exist
+ * (undefined_column, 42703).
+ *
+ * In practice that means the app was deployed with a schema change that
+ * hasn't been applied yet — supabase/schema.sql needs re-running. Worth
+ * naming specifically, because the generic "Could not save" it would
+ * otherwise produce sends you looking at the wrong thing entirely.
+ */
+export function isMissingColumn(error: { code?: string } | null): boolean {
+  return error?.code === "42703";
+}
+
 /** Row shape as stored in Postgres (snake_case). */
 export interface ContactMessageRow {
   id: string;
@@ -71,6 +84,8 @@ export interface ArtworkRow {
   description: string;
   image: string;
   dimensions: string | null;
+  image_width: number | null;
+  image_height: number | null;
   status: string | null;
   youtube_url: string | null;
   details: string[] | null;

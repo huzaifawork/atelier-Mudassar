@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
-import { categoryLabels, type Category } from "../data/artworks";
+import { categoryLabels, type Artwork, type Category } from "../data/artworks";
 import { useGallery } from "../lib/galleryStore";
+import { DEFAULT_RATIO, ratioOf } from "../lib/galleryMap";
 import ProtectedImage from "./gallery/ProtectedImage";
 import StatusBadge from "./gallery/StatusBadge";
 import Lightbox from "./gallery/Lightbox";
@@ -26,6 +27,97 @@ function VideoGlyph() {
     >
       <path d="M8 5.5v13l11-6.5-11-6.5z" />
     </svg>
+  );
+}
+
+/**
+ * One artwork in the grid, sized to the piece itself.
+ *
+ * The card used to be a fixed 3:4 box, which meant a landscape or square work
+ * was drawn small in the middle of a portrait frame with bars either side —
+ * every piece read as a portrait regardless of what was uploaded. The box now
+ * takes the artwork's own aspect ratio instead, so the frame ends exactly at
+ * the image's edges.
+ *
+ * Artwork uploaded since the real pixel size started being recorded knows its
+ * shape up front, so the card reserves the right space before the image
+ * arrives and nothing shifts. Older pieces fall back to their `dimensions`
+ * text, and failing that correct themselves once the image reports its true
+ * size on load.
+ */
+function GalleryCard({
+  artwork,
+  index,
+  onOpen,
+}: {
+  artwork: Artwork;
+  index: number;
+  onOpen: () => void;
+}) {
+  const [ratio, setRatio] = useState(() => ratioOf(artwork) ?? DEFAULT_RATIO);
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      transition={{ duration: 0.5, delay: index * 0.04 }}
+      onClick={onOpen}
+      onContextMenu={(e) => e.preventDefault()}
+      onDragStart={(e) => e.preventDefault()}
+      style={{ aspectRatio: ratio }}
+      className="group relative block w-full mb-5 sm:mb-6 lg:mb-8 break-inside-avoid overflow-hidden bg-espresso cursor-pointer text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-bright"
+    >
+      {/* The box is already the image's shape, so "contain" crops nothing —
+          it just guarantees the whole piece stays visible if a recorded size
+          is ever slightly out of step with the file. */}
+      <ProtectedImage
+        src={artwork.image}
+        alt={artwork.title}
+        fit="contain"
+        onNaturalSize={(w, h) => setRatio(w / h)}
+      />
+
+      <div className="absolute inset-0 bg-linear-to-t from-ink via-ink/10 to-transparent opacity-70 group-hover:opacity-90 transition-opacity duration-500" />
+
+      <div className="absolute top-4 left-4 right-4 flex items-start justify-between gap-2 z-10">
+        {artwork.status && <StatusBadge status={artwork.status} />}
+        {artwork.youtubeUrl && (
+          <span
+            aria-hidden
+            className="ml-auto w-8 h-8 shrink-0 rounded-full border border-gold-bright/60 bg-ink/60 backdrop-blur-sm flex items-center justify-center text-gold-bright"
+          >
+            <VideoGlyph />
+          </span>
+        )}
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5 translate-y-0 sm:translate-y-2 opacity-100 sm:opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-400 bg-linear-to-t from-ink/90 to-transparent sm:bg-none">
+        <p className="font-display text-lg sm:text-xl text-porcelain">
+          {artwork.title}
+        </p>
+        <p className="text-copper text-xs tracking-[0.2em] uppercase mt-1">
+          {artwork.year} · {categoryLabels[artwork.category]}
+        </p>
+      </div>
+
+      <div className="absolute top-4 right-4 w-8 h-8 rounded-full border border-gold-bright/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-400">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          className="text-gold-bright"
+        >
+          <path
+            d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
+    </motion.button>
   );
 }
 
@@ -114,73 +206,21 @@ export default function Gallery() {
             ))}
           </div>
 
-          <motion.div
-            layout
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8"
-          >
-            <AnimatePresence mode="popLayout">
+          {/* Multi-column rather than a fixed grid: cards are each the
+              artwork's own shape now, so heights vary and a grid would leave
+              a gap under every short one. Columns close those up. */}
+          <div className="columns-1 sm:columns-2 lg:columns-3 gap-5 sm:gap-6 lg:gap-8">
+            <AnimatePresence>
               {visible.map((art, i) => (
-                <motion.button
+                <GalleryCard
                   key={art.slug}
-                  layout
-                  initial={{ opacity: 0, y: 24 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ duration: 0.5, delay: i * 0.04 }}
-                  onClick={() => setActiveIndex(i)}
-                  onContextMenu={(e) => e.preventDefault()}
-                  onDragStart={(e) => e.preventDefault()}
-                  className="group relative overflow-hidden bg-espresso cursor-pointer text-left aspect-3/4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-bright"
-                >
-                  <ProtectedImage
-                    src={art.image}
-                    alt={art.title}
-                    fit="contain"
-                  />
-
-                  <div className="absolute inset-0 bg-linear-to-t from-ink via-ink/10 to-transparent opacity-70 group-hover:opacity-90 transition-opacity duration-500" />
-
-                  <div className="absolute top-4 left-4 right-4 flex items-start justify-between gap-2 z-10">
-                    {art.status && <StatusBadge status={art.status} />}
-                    {art.youtubeUrl && (
-                      <span
-                        aria-hidden
-                        className="ml-auto w-8 h-8 shrink-0 rounded-full border border-gold-bright/60 bg-ink/60 backdrop-blur-sm flex items-center justify-center text-gold-bright"
-                      >
-                        <VideoGlyph />
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5 translate-y-0 sm:translate-y-2 opacity-100 sm:opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-400 bg-linear-to-t from-ink/90 to-transparent sm:bg-none">
-                    <p className="font-display text-lg sm:text-xl text-porcelain">
-                      {art.title}
-                    </p>
-                    <p className="text-copper text-xs tracking-[0.2em] uppercase mt-1">
-                      {art.year} · {categoryLabels[art.category]}
-                    </p>
-                  </div>
-
-                  <div className="absolute top-4 right-4 w-8 h-8 rounded-full border border-gold-bright/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-400">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      className="text-gold-bright"
-                    >
-                      <path
-                        d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </div>
-                </motion.button>
+                  artwork={art}
+                  index={i}
+                  onOpen={() => setActiveIndex(i)}
+                />
               ))}
             </AnimatePresence>
-          </motion.div>
+          </div>
         </div>
 
         <AnimatePresence>

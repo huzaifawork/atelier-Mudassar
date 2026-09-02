@@ -14,8 +14,8 @@ import {
   type Category,
 } from "../../data/artworks";
 import { useGallery, uploadArtworkImage, deleteUnusedArtworkImage } from "../../lib/galleryStore";
-import { imageSrcFor } from "../../lib/galleryMap";
-import { assertUploadableImage } from "../../lib/imageFormats";
+import { DEFAULT_RATIO, imageSrcFor, ratioOf } from "../../lib/galleryMap";
+import { assertUploadableImage, readImageSize } from "../../lib/imageFormats";
 import { extractVideoId, thumbnailFor } from "../../lib/youtube";
 import PreviewModal from "./PreviewModal";
 
@@ -107,6 +107,22 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
       const url = URL.createObjectURL(file);
       setPendingFile(file);
       setLocalPreview(url);
+
+      // Record the file's real pixel size. The gallery reserves each card at
+      // this shape, which is what lets a landscape or square piece show as
+      // itself instead of being letterboxed into a portrait box.
+      const size = await readImageSize(file);
+      if (!size) return;
+      setDraft((current) => ({
+        ...current,
+        imageWidth: size.width,
+        imageHeight: size.height,
+        // Fill the visitor-facing caption too, but never overwrite wording
+        // the artist has already chosen.
+        dimensions: current.dimensions?.trim()
+          ? current.dimensions
+          : `${size.width} × ${size.height} px`,
+      }));
     },
     [localPreview],
   );
@@ -115,10 +131,15 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
     if (localPreview) URL.revokeObjectURL(localPreview);
     setLocalPreview(null);
     setPendingFile(null);
-    set("image", "");
-    set("dimensions", "");
+    setDraft((current) => ({
+      ...current,
+      image: "",
+      dimensions: "",
+      imageWidth: undefined,
+      imageHeight: undefined,
+    }));
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [localPreview, set]);
+  }, [localPreview]);
 
   const videoId = draft.youtubeUrl ? extractVideoId(draft.youtubeUrl) : null;
   const videoInvalid = Boolean(draft.youtubeUrl?.trim()) && !videoId;
@@ -191,7 +212,10 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
         {/* ---------------------------------------------------------------- */}
         <div className="lg:sticky lg:top-24">
           <span className={label}>Artwork image</span>
-          <div className="relative aspect-3/4 w-full bg-espresso border border-gold/20 overflow-hidden flex items-center justify-center">
+          <div
+            className="relative w-full bg-espresso border border-gold/20 overflow-hidden flex items-center justify-center"
+            style={{ aspectRatio: ratioOf(draft) ?? DEFAULT_RATIO }}
+          >
             {shownImage ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img

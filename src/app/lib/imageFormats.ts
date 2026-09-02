@@ -82,3 +82,49 @@ export async function assertUploadableImage(file: File): Promise<void> {
     throw new Error("That file doesn't look like a valid image.");
   }
 }
+
+/**
+ * The picked file's real pixel size, decoded in the browser.
+ *
+ * Recorded on the artwork so the gallery can reserve each card at the piece's
+ * own shape before the image has loaded — otherwise a landscape or square
+ * work sits letterboxed in a portrait box, or the grid reflows under the
+ * visitor as images arrive.
+ *
+ * Returns null rather than throwing: a missing size costs a fallback, and is
+ * never a reason to block an upload that has already passed its checks.
+ */
+export async function readImageSize(
+  file: File,
+): Promise<{ width: number; height: number } | null> {
+  // createImageBitmap decodes off the main thread and needs no DOM node, but
+  // isn't everywhere (older Safari, and it rejects some AVIF builds), so fall
+  // back to an <img> against an object URL.
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const { width, height } = bitmap;
+      bitmap.close();
+      if (width && height) return { width, height };
+    } catch {
+      // Fall through.
+    }
+  }
+
+  const url = URL.createObjectURL(file);
+  try {
+    return await new Promise((resolve) => {
+      const image = new Image();
+      image.onload = () =>
+        resolve(
+          image.naturalWidth && image.naturalHeight
+            ? { width: image.naturalWidth, height: image.naturalHeight }
+            : null,
+        );
+      image.onerror = () => resolve(null);
+      image.src = url;
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}

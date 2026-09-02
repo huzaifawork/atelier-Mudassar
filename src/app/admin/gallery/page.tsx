@@ -11,7 +11,7 @@ import {
   type ArtworkStatus,
 } from "../../data/artworks";
 import { useGallery } from "../../lib/galleryStore";
-import { imageSrcFor } from "../../lib/galleryMap";
+import { DEFAULT_RATIO, imageSrcFor, ratioOf } from "../../lib/galleryMap";
 import StatusBadge from "../../components/gallery/StatusBadge";
 import PreviewModal from "./PreviewModal";
 import SettingsPanel from "./SettingsPanel";
@@ -114,7 +114,10 @@ export default function AdminGalleryPage() {
             key={item.id}
             className="grid grid-cols-[76px_1fr] sm:grid-cols-[76px_1fr_auto] gap-4 items-start border border-gold/15 bg-espresso/40 p-3 hover:border-gold/30 transition-colors"
           >
-            <div className="relative aspect-3/4 w-full bg-espresso overflow-hidden">
+            <div
+              className="relative w-full bg-espresso overflow-hidden"
+              style={{ aspectRatio: ratioOf(item) ?? DEFAULT_RATIO }}
+            >
               {/* A small, optimized thumbnail — not the full-resolution
                   original — keeps this list fast even with many large
                   admin-uploaded images. */}
@@ -123,7 +126,7 @@ export default function AdminGalleryPage() {
                 alt=""
                 width={96}
                 height={128}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 onContextMenu={(event) => event.preventDefault()}
               />
             </div>

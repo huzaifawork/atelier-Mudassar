@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { getServiceClient, type ArtworkRow } from "../../../lib/supabase";
+import {
+  getServiceClient,
+  isMissingColumn,
+  type ArtworkRow,
+} from "../../../lib/supabase";
 import { draftToRow, rowToArtwork } from "../../../lib/galleryMap";
 import type { ArtworkDraft } from "../../../data/artworks";
 import { guardAdmin } from "../../../lib/adminGuard";
@@ -77,6 +81,12 @@ export async function POST(request: Request) {
   if (error) {
     const conflict = error.code === "23505";
     if (!conflict) console.error("POST /api/gallery/items:", error);
+    if (isMissingColumn(error)) {
+      return NextResponse.json(
+        { error: "The database is missing a column this version needs — re-run supabase/schema.sql." },
+        { status: 500 },
+      );
+    }
     return NextResponse.json(
       {
         error: conflict
