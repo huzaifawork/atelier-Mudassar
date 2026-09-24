@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Lenis from "lenis";
+import { registerSmoothScroll } from "../lib/smoothScroll";
 
 export default function SmoothScroll() {
   useEffect(() => {
@@ -10,13 +11,22 @@ export default function SmoothScroll() {
       easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
     });
 
+    // Published so overlays can hold the page still while they're open.
+    // Lenis drives the scroll itself, so body overflow can't stop it.
+    registerSmoothScroll(lenis);
+
+    let frame = 0;
     function raf(time: number) {
       lenis.raf(time);
-      requestAnimationFrame(raf);
+      frame = requestAnimationFrame(raf);
     }
-    requestAnimationFrame(raf);
+    frame = requestAnimationFrame(raf);
 
-    return () => lenis.destroy();
+    return () => {
+      cancelAnimationFrame(frame);
+      registerSmoothScroll(null);
+      lenis.destroy();
+    };
   }, []);
 
   return null;

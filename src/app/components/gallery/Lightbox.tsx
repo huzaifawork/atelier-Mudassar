@@ -5,6 +5,7 @@ import { motion, MotionConfig } from "framer-motion";
 import type { Artwork } from "../../data/artworks";
 import { categoryLabels } from "../../data/artworks";
 import { DEFAULT_RATIO, displayRefFor, ratioOf } from "../../lib/galleryMap";
+import { holdPageScroll } from "../../lib/smoothScroll";
 import ProtectedImage from "./ProtectedImage";
 import StatusBadge from "./StatusBadge";
 import YouTubeEmbed from "./YouTubeEmbed";
@@ -83,6 +84,17 @@ export default function Lightbox({
     };
   }, []);
 
+  // Hold the page still for as long as this is open.
+  //
+  // Setting body overflow (which the gallery already does) is not enough on
+  // its own: Lenis drives smooth scrolling by intercepting wheel and touch
+  // events on the window and moving the page itself, so it never consults
+  // overflow. Without this, scrolling over the lightbox scrolled the site
+  // behind it instead of the text beside the artwork. Lives here rather than
+  // in the gallery so the admin's preview, which renders this same
+  // component, behaves the same way.
+  useEffect(() => holdPageScroll(), []);
+
   // Minimal focus trap: Tab/Shift+Tab wrap within the dialog instead of
   // escaping into the gallery grid behind it.
   useEffect(() => {
@@ -135,11 +147,18 @@ export default function Lightbox({
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
           onClick={(e) => e.stopPropagation()}
-          className="grid lg:grid-cols-[1.3fr_1fr] gap-6 lg:gap-14 max-w-5xl w-full max-h-[88vh] overflow-y-auto items-start lg:items-center"
+          /* Flex, with a definite height, so the two halves can behave
+             differently: the artwork is pinned and the text scrolls beside
+             it. This used to be one grid that scrolled as a whole, which put
+             the image on a long scroll track and — because the columns were
+             centred against each other — pushed it far down whenever the
+             description was long, so opening a piece showed empty space
+             where the artwork should be. */
+          className="flex flex-col lg:flex-row gap-5 lg:gap-12 max-w-5xl w-full h-[88vh] max-h-full"
         >
           <div
             ref={slotRef}
-            className="relative w-full h-[40vh] sm:h-[50vh] lg:h-[75vh] flex items-center justify-center"
+            className="relative shrink-0 w-full lg:w-[56%] h-[38vh] sm:h-[46vh] lg:h-full flex items-center justify-center"
           >
             {/* Anchored to the image slot, not the viewport — the content
                 column below scrolls independently on mobile, so centering
@@ -194,7 +213,11 @@ export default function Lightbox({
             </div>
           </div>
 
-          <div className="pb-4 lg:pb-0">
+          {/* The only part that scrolls. min-h-0 is what lets a flex child
+              shrink below its content and actually overflow; overscroll-contain
+              stops a scroll that reaches the end here from continuing on into
+              the page behind. */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-4 pr-1 lg:pr-2">
             <p className="text-copper text-xs tracking-[0.4em] uppercase mb-3">
               {categoryLabels[artwork.category]}
             </p>
