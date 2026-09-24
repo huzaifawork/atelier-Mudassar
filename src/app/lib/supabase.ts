@@ -95,6 +95,7 @@ export interface ArtworkRow {
 }
 
 export const BLOG_BUCKET = "blog";
+export const EVENT_BUCKET = "events";
 
 /** Row shape as stored in Postgres (snake_case). */
 export interface BlogPostRow {
@@ -106,4 +107,20 @@ export interface BlogPostRow {
   cover_image: string | null;
   published: boolean;
   published_at: string;
+}
+
+/** Row shape as stored in Postgres (snake_case). `images` and `links` are
+ *  jsonb; they are validated on the way in and typed on the way out by
+ *  lib/eventsMap.ts rather than trusted blindly. */
+export interface EventRow {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  body: string;
+  event_date: string;
+  location: string | null;
+  images: unknown;
+  links: unknown;
+  published: boolean;
 }

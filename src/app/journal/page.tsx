@@ -2,20 +2,26 @@ import type { Metadata } from "next";
 import Navbar from "../components/Navbar";
 import SiteFooter from "../components/SiteFooter";
 import ScrollProgress from "../components/ScrollProgress";
-import JournalIndex from "../components/blog/JournalIndex";
+import JournalAndEvents from "../components/journal/JournalAndEvents";
 import { fetchPublishedPosts } from "../lib/blogServer";
+import { fetchPublishedEvents } from "../lib/eventsServer";
 
 // Admin edits should show up on the next visit without a redeploy.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "The Journal — Atelier Mudassar",
+  title: "Journal & Events — Atelier Mudassar",
   description:
-    "Notes from the studio of Mudassar Ghaffar — on process, materials, symbolism, and the thinking behind each digital painting.",
+    "Notes from the studio of Mudassar Ghaffar, and news of where the work has been shown and written about.",
 };
 
-export default async function BlogPage() {
-  const posts = await fetchPublishedPosts();
+export default async function JournalPage() {
+  // Both in parallel: neither depends on the other, and the page cannot
+  // render until it has both.
+  const [posts, events] = await Promise.all([
+    fetchPublishedPosts(),
+    fetchPublishedEvents(),
+  ]);
 
   return (
     <>
@@ -35,7 +41,7 @@ export default async function BlogPage() {
               Atelier Mudassar
             </span>
             <h1 className="font-display text-4xl sm:text-6xl text-porcelain mt-5">
-              The <span className="text-gold">Journal</span>
+              Journal <span className="text-gold">&amp; Events</span>
             </h1>
 
             <div className="flex items-center justify-center gap-4 mt-7">
@@ -45,12 +51,12 @@ export default async function BlogPage() {
             </div>
 
             <p className="font-accent italic text-lg sm:text-xl text-cream-dim/85 mt-7 leading-relaxed text-balance">
-              Notes from the studio — on process, materials, symbolism, and the
-              thinking behind each piece.
+              Notes from the studio, and news of where the work has been shown
+              and written about.
             </p>
           </header>
 
-          <JournalIndex posts={posts} />
+          <JournalAndEvents posts={posts} events={events} />
         </div>
       </main>
 

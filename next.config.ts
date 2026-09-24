@@ -69,6 +69,15 @@ const nextConfig: NextConfig = {
   },
   // Don't advertise the framework version to scanners.
   poweredByHeader: false,
+  // The journal moved to /journal when events joined it there, so the old
+  // addresses keep working rather than turning into 404s for anyone who
+  // bookmarked or linked one.
+  async redirects() {
+    return [
+      { source: "/blog", destination: "/journal", permanent: true },
+      { source: "/blog/:slug", destination: "/journal/:slug", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

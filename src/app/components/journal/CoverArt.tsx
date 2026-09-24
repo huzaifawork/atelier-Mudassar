@@ -1,29 +1,32 @@
 import Image from "next/image";
-import { coverSrcFor } from "../../lib/blogMap";
 
 /**
- * A post's cover — or a typographic stand-in when there isn't one.
+ * A cover picture — or a typographic stand-in when there isn't one.
  *
  * Covers are optional by design, so every card and header has to look
  * deliberate without an image rather than collapsing into an empty box.
+ *
+ * Takes an already-resolved URL rather than a stored reference, because a
+ * journal cover and an event photograph live in different buckets and are
+ * served by different routes.
  */
 export default function CoverArt({
-  cover,
+  src,
   title,
   sizes,
   priority = false,
   className = "",
 }: {
-  cover?: string;
+  src?: string;
   title: string;
   sizes: string;
   priority?: boolean;
   className?: string;
 }) {
-  if (cover) {
+  if (src) {
     return (
       <Image
-        src={coverSrcFor(cover)}
+        src={src}
         alt={title}
         fill
         sizes={sizes}

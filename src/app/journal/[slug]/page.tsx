@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import SiteFooter from "../../components/SiteFooter";
 import ScrollProgress from "../../components/ScrollProgress";
-import CoverArt from "../../components/blog/CoverArt";
+import CoverArt from "../../components/journal/CoverArt";
+import { coverSrcFor } from "../../lib/blogMap";
 import { fetchPostBySlug, fetchPublishedPosts } from "../../lib/blogServer";
 import {
   excerptFor,
@@ -60,7 +61,7 @@ export default async function BlogPostPage({
 
         <article className="relative max-w-3xl mx-auto px-6 sm:px-10 pt-36 sm:pt-44 pb-20">
           <Link
-            href="/blog"
+            href="/journal"
             className="inline-flex items-center gap-2.5 text-[0.68rem] tracking-[0.28em] uppercase text-cream-dim/70 hover:text-gold-bright transition-colors"
           >
             <span aria-hidden>←</span> The Journal
@@ -96,7 +97,7 @@ export default async function BlogPostPage({
           {post.coverImage && (
             <figure className="relative aspect-16/9 w-full mt-12 overflow-hidden">
               <CoverArt
-                cover={post.coverImage}
+                src={post.coverImage ? coverSrcFor(post.coverImage) : undefined}
                 title={post.title}
                 sizes="(max-width: 768px) 92vw, 768px"
                 priority
@@ -126,7 +127,7 @@ export default async function BlogPostPage({
               — Mudassar Ghaffar
             </p>
             <Link
-              href="/blog"
+              href="/journal"
               className="text-[0.7rem] tracking-[0.25em] uppercase border border-gold/40 text-gold px-5 py-3 hover:bg-gold hover:text-ink transition-all duration-300"
             >
               All entries
@@ -148,7 +149,7 @@ export default async function BlogPostPage({
                 {more.map((other) => (
                   <li key={other.id}>
                     <Link
-                      href={`/blog/${other.slug}`}
+                      href={`/journal/${other.slug}`}
                       className="group flex flex-col h-full border border-gold/15 bg-ink/40 p-5 hover:border-gold/40 transition-colors duration-500"
                     >
                       <time

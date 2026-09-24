@@ -16,7 +16,11 @@ import {
   type ArtworkStatus,
   type GallerySettings,
 } from "../data/artworks";
-import { assertUploadableImage, createDisplayImage } from "./imageFormats";
+import {
+  deleteUnusedImage,
+  uploadImage,
+  type UploadedImage,
+} from "./uploadImage";
 
 interface GalleryContextValue {
   items: Artwork[];
@@ -47,115 +51,23 @@ async function readError(response: Response, fallback: string) {
   }
 }
 
-/**
- * Puts one blob in the artworks bucket and returns its "storage:<path>" ref.
- *
- * The bytes go straight from this browser to Supabase Storage, not through
- * /api/gallery/upload. That route runs as a Vercel function, and a Vercel
- * function's request body is capped at 4.5 MB — the platform answers anything
- * larger with a bare 413 before our handler ever runs, which is what used to
- * make every real artwork export fail with a generic "Upload failed". So the
- * route only signs the upload and checks it afterwards; the transfer itself
- * bypasses it entirely.
- */
-async function putInBucket(body: Blob, contentType: string): Promise<string> {
-  const signed = await fetch("/api/gallery/upload", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contentType, size: body.size }),
-  });
-  if (!signed.ok) {
-    throw new Error(await readError(signed, "Upload failed"));
-  }
-  const { bucket, path, token, image } = (await signed.json()) as {
-    bucket: string;
-    path: string;
-    token: string;
-    image: string;
-  };
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Uploads are not configured.");
-  }
-
-  // Imported on demand: this module is in the public gallery's bundle too, and
-  // only an admin picking a file ever needs the storage client.
-  const { createClient } = await import("@supabase/supabase-js");
-  const storage = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: false },
-  }).storage.from(bucket);
-
-  const { error } = await storage.uploadToSignedUrl(path, token, body, {
-    contentType,
-    upsert: false,
-  });
-  if (error) {
-    throw new Error("Could not upload the image. Check your connection and try again.");
-  }
-
-  // The server never saw these bytes, so let it read the first few back and
-  // confirm the file is what it said it was. A failure here has already
-  // removed the object server-side; the extra cleanup covers the other cases.
-  const verified = await fetch("/api/gallery/upload", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image, contentType }),
-  });
-  if (!verified.ok) {
-    void deleteUnusedArtworkImage(image);
-    throw new Error(await readError(verified, "Upload failed"));
-  }
-
-  return image;
-}
+/** Where the gallery's signed uploads are minted and checked. */
+const ARTWORK_UPLOAD_ENDPOINT = "/api/gallery/upload";
 
 /**
  * Uploads an artwork: the original, plus the web-sized copy visitors get.
  *
- * Both are stored. `image` is the untouched export and stays the artist's
- * master; `displayImage` is what the site renders. Without the second one the
- * image optimizer has to pull a full 40-to-140-megapixel export through a
- * function every time it needs a size it hasn't cached — which is what made
- * the gallery slow to paint.
- *
- * The derivative is best-effort. If the browser can't decode the file (a very
- * large export can exhaust memory) or the encode gains nothing, it is simply
- * omitted and the original is served: slower for that one piece, never broken.
+ * The mechanics live in lib/uploadImage.ts, shared with events — both go
+ * straight from the browser to Supabase on a signed URL, because a Vercel
+ * function's 4.5 MB request-body cap rejects a real artwork export outright.
  */
-export async function uploadArtworkImage(
-  file: File,
-): Promise<{ image: string; displayImage?: string }> {
-  // Cheap local checks first, so an unusable file is rejected with a specific
-  // reason before a single byte goes over the wire.
-  await assertUploadableImage(file);
-
-  const image = await putInBucket(file, file.type);
-
-  let displayImage: string | undefined;
-  try {
-    const display = await createDisplayImage(file);
-    if (display) displayImage = await putInBucket(display, "image/webp");
-  } catch {
-    displayImage = undefined;
-  }
-
-  return { image, displayImage };
+export async function uploadArtworkImage(file: File): Promise<UploadedImage> {
+  return uploadImage(file, ARTWORK_UPLOAD_ENDPOINT);
 }
 
 /** Best-effort cleanup for an upload that was never attached to a saved artwork. */
 export async function deleteUnusedArtworkImage(image: string): Promise<void> {
-  try {
-    await fetch("/api/gallery/upload", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image }),
-    });
-  } catch {
-    // Best-effort — a failed cleanup just leaves one orphaned object, which
-    // is the exact status quo this exists to reduce, not a new failure mode.
-  }
+  return deleteUnusedImage(image, ARTWORK_UPLOAD_ENDPOINT);
 }
 
 export function GalleryProvider({

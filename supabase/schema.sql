@@ -212,3 +212,66 @@ create trigger blog_posts_touch_updated_at
 insert into storage.buckets (id, name, public)
 values ('blog', 'blog', false)
 on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Events
+--
+-- Exhibitions, features, press — the things that happen around the work,
+-- listed alongside the Journal rather than on their own page. An event is
+-- mostly pictures and links: where it happened, and where it was written up.
+-- ---------------------------------------------------------------------------
+create table if not exists public.events (
+  id          uuid primary key default gen_random_uuid(),
+  slug        text not null unique,
+  title       text not null,
+  -- Card summary. Falls back to the opening of `body` when left blank.
+  summary     text not null default '',
+  -- Plain text; blank lines separate paragraphs, same as a journal post.
+  body        text not null default '',
+  -- The date the event happened, which is not the date it was added.
+  event_date  date not null default current_date,
+  location    text,
+  -- Ordered gallery. The first entry doubles as the cover, so there is no
+  -- separate cover field to keep in sync. Each entry is
+  --   { "image", "displayImage", "width", "height" }
+  -- mirroring an artwork: `image` is the untouched upload, `displayImage` the
+  -- web-sized copy actually served, and the dimensions let a card reserve the
+  -- right shape before the picture loads.
+  images      jsonb not null default '[]'::jsonb,
+  -- Where this was published: [{ "label": "Instagram", "url": "https://..." }]
+  links       jsonb not null default '[]'::jsonb,
+  published   boolean not null default true,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists events_event_date_idx on public.events (event_date desc);
+
+alter table public.events enable row level security;
+
+-- Same arrangement as the journal: unpublished events are invisible to the
+-- anon key, and every write goes through a route handler on the service key.
+drop policy if exists "published events are publicly readable" on public.events;
+create policy "published events are publicly readable"
+  on public.events for select using (published);
+
+drop trigger if exists events_touch_updated_at on public.events;
+create trigger events_touch_updated_at
+  before update on public.events
+  for each row execute function public.touch_updated_at();
+
+-- Private bucket for event photographs, mirroring `artworks` and `blog`.
+-- Browsers never see a Supabase URL; bytes stream through /api/events/image.
+insert into storage.buckets (id, name, public)
+values ('events', 'events', false)
+on conflict (id) do nothing;
+
+-- Event photographs come off a phone or a camera and go up on a signed URL
+-- straight from the browser, so — exactly as with artwork — these limits are
+-- what actually enforces the size and format the app claims to accept.
+update storage.buckets
+set file_size_limit = 26214400,  -- 25 MB, matching MAX_BYTES in lib/imageFormats.ts
+    allowed_mime_types = array[
+      'image/png', 'image/jpeg', 'image/webp', 'image/avif'
+    ]
+where id = 'events';

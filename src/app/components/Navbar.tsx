@@ -14,7 +14,7 @@ const sections = [
   { label: "Process", id: "process" },
 ];
 
-const JOURNAL_HREF = "/blog";
+const JOURNAL_HREF = "/journal";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -26,7 +26,7 @@ export default function Navbar() {
 
   // The nav is shared by the landing page and the journal, so section links
   // have to be absolute once we're off "/" — a bare "#about" would just add a
-  // fragment to /blog and go nowhere.
+  // fragment to /journal and go nowhere.
   const onHome = pathname === "/";
   const hrefFor = (id: string) => (onHome ? `#${id}` : `/#${id}`);
   const onJournal = pathname === JOURNAL_HREF || pathname.startsWith(`${JOURNAL_HREF}/`);

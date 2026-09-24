@@ -92,7 +92,7 @@ export default function AdminBlogPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <Link
-            href="/blog"
+            href="/journal"
             className="px-5 py-3 text-xs tracking-[0.2em] uppercase border border-gold/25 text-cream-dim hover:border-gold/60 hover:text-gold-bright transition-colors"
           >
             View journal
@@ -182,7 +182,7 @@ export default function AdminBlogPage() {
               </Link>
               {post.published && (
                 <Link
-                  href={`/blog/${post.slug}`}
+                  href={`/journal/${post.slug}`}
                   className={`${action} border-gold/20 text-cream-dim hover:border-gold/60 hover:text-gold-bright`}
                 >
                   View
