@@ -213,11 +213,20 @@ export default function Lightbox({
             </div>
           </div>
 
-          {/* The only part that scrolls. min-h-0 is what lets a flex child
-              shrink below its content and actually overflow; overscroll-contain
-              stops a scroll that reaches the end here from continuing on into
-              the page behind. */}
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-4 pr-1 lg:pr-2">
+          {/* The only part that scrolls.
+              min-h-0 is what lets a flex child shrink below its content and
+              actually overflow. overscroll-contain stops a scroll that reaches
+              the end here from carrying on into the page behind.
+              data-lenis-prevent is what makes it scroll at all: holding the
+              page still stops Lenis, and a stopped Lenis swallows every wheel
+              and touch event on the window, including the ones meant for this
+              column. Lenis checks this attribute before it checks whether it
+              is stopped, so marking the scroller hands these events back to
+              the browser while the page itself stays frozen. */}
+          <div
+            data-lenis-prevent
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-4 pr-1 lg:pr-2"
+          >
             <p className="text-copper text-xs tracking-[0.4em] uppercase mb-3">
               {categoryLabels[artwork.category]}
             </p>
