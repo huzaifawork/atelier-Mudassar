@@ -45,6 +45,7 @@ function emptyDraft(): ArtworkDraft {
     medium: "Digital Painting",
     category: "portrait",
     description: "",
+    artistStatement: "",
     image: "",
     dimensions: "",
     status: undefined,
@@ -195,6 +196,7 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
         title: draft.title.trim(),
         medium: draft.medium.trim() || "Digital Painting",
         dimensions: draft.dimensions?.trim() || undefined,
+        artistStatement: draft.artistStatement?.trim() || undefined,
         youtubeUrl: videoId ? draft.youtubeUrl!.trim() : undefined,
         details: detailsText.split("\n").map((line) => line.trim()).filter(Boolean),
       };
@@ -439,6 +441,25 @@ export default function ArtworkForm({ existing }: { existing?: Artwork }) {
             />
             <p className={hint}>
               One per line. Shown as a bullet list; hidden entirely when empty.
+            </p>
+          </div>
+
+          <div>
+            <label className={label} htmlFor="artist-statement">
+              Artist statement
+            </label>
+            <textarea
+              id="artist-statement"
+              rows={4}
+              className={`${input} resize-y leading-relaxed`}
+              value={draft.artistStatement ?? ""}
+              onChange={(event) => set("artistStatement", event.target.value)}
+              placeholder="In his own words, about this piece…"
+            />
+            <p className={hint}>
+              Optional. Shown at the end of the artwork&rsquo;s panel, set apart
+              from the description and signed. Leave empty and no statement
+              block appears.
             </p>
           </div>
 

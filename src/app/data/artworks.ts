@@ -33,6 +33,10 @@ export interface Artwork {
    *  generated yet, in which case the original is served instead — correct,
    *  just far slower. Resolve with displaySrcFor() in lib/galleryMap.ts. */
   displayImage?: string;
+  /** The artist's own words about this piece, in his voice rather than the
+   *  gallery's. Shown in the lightbox, set apart from the text describing the
+   *  work, and signed. Optional: without one no statement block is rendered. */
+  artistStatement?: string;
   status?: ArtworkStatus;
   /** Optional related process/showcase video. Only rendered when present. */
   youtubeUrl?: string;

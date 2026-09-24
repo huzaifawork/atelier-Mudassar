@@ -87,6 +87,7 @@ export interface ArtworkRow {
   image_width: number | null;
   image_height: number | null;
   display_image: string | null;
+  artist_statement: string | null;
   status: string | null;
   youtube_url: string | null;
   details: string[] | null;

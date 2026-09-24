@@ -68,6 +68,14 @@ alter table public.artworks add column if not exists image_height integer;
 -- scripts/backfill-display-images.mjs to fill these in.
 alter table public.artworks add column if not exists display_image text;
 
+-- The artist's own words about this particular piece, shown in the lightbox
+-- below everything describing the work itself and set apart from it.
+--
+-- Distinct from `description`, which is the summary of the artwork; this is
+-- the artist speaking, and it is signed as such. Optional — a piece without
+-- one simply shows no statement block rather than an empty heading.
+alter table public.artworks add column if not exists artist_statement text;
+
 -- ---------------------------------------------------------------------------
 -- Section-level copy that used to be hardcoded in Gallery.tsx
 -- ---------------------------------------------------------------------------

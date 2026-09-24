@@ -242,6 +242,27 @@ export default function Lightbox({
                 <YouTubeEmbed url={artwork.youtubeUrl} />
               </div>
             )}
+
+            {/* Last, and deliberately unlike everything above it.
+                Everything before this describes the work; this is the artist
+                speaking about it, so it gets the voice the landing page's
+                Artist Statement section uses — copper eyebrow, accent italic,
+                signed in gold — set into its own panel behind a gold rule.
+                Placed at the end because the piece's own text should lead. */}
+            {artwork.artistStatement?.trim() && (
+              <figure className="mt-8 border-l-2 border-gold/50 bg-espresso/60 py-5 pl-5 pr-4">
+                <figcaption className="text-copper text-[0.65rem] tracking-[0.35em] uppercase">
+                  Artist Statement
+                </figcaption>
+                {/* pre-line so the paragraph breaks the artist typed survive. */}
+                <blockquote className="mt-3 font-accent italic text-porcelain/90 leading-relaxed text-[0.95rem] sm:text-base whitespace-pre-line">
+                  {artwork.artistStatement.trim()}
+                </blockquote>
+                <p className="mt-4 font-accent italic text-gold-bright text-sm">
+                  &mdash; Mudassar Ghaffar
+                </p>
+              </figure>
+            )}
           </div>
         </motion.div>
       </motion.div>
