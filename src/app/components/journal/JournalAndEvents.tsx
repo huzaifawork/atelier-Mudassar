@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import {
@@ -20,6 +20,9 @@ import { eventDisplaySrc } from "../../lib/eventsMap";
 import CoverArt from "./CoverArt";
 
 const ease = [0.16, 1, 0.3, 1] as const;
+
+/** Cards after the featured one, per batch. More are appended on approach. */
+const BATCH = 9;
 
 type Kind = "post" | "event";
 type Filter = "all" | Kind;
@@ -209,6 +212,8 @@ export default function JournalAndEvents({
   events: Event[];
 }) {
   const [filter, setFilter] = useState<Filter>("all");
+  const [shown, setShown] = useState(BATCH);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const entries = useMemo(() => {
     const all = [...posts.map(entryForPost), ...events.map(entryForEvent)];
@@ -223,6 +228,38 @@ export default function JournalAndEvents({
   // Only offer a filter when there is something of both kinds to filter.
   const showFilters = posts.length > 0 && events.length > 0;
 
+  // Start again at one batch whenever the filter changes the list underneath.
+  // Adjusted during render rather than in an effect, which would paint one
+  // frame of the previous count first.
+  const [batchedFilter, setBatchedFilter] = useState(filter);
+  if (filter !== batchedFilter) {
+    setBatchedFilter(filter);
+    setShown(BATCH);
+  }
+
+  const [featured, ...allRest] = visible;
+  // Only a batch is mounted at a time: every card is a motion component with
+  // an image, and a few hundred entries would otherwise all be built before
+  // the visitor had scrolled past the first row.
+  const rest = allRest.slice(0, shown);
+  const hasMore = rest.length < allRest.length;
+
+  useEffect(() => {
+    if (!hasMore) return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (observed) => {
+        if (observed[0]?.isIntersecting) setShown((count) => count + BATCH);
+      },
+      // Well ahead of the viewport, so the next batch is mounted and its
+      // covers are already fetching by the time they are scrolled to.
+      { rootMargin: "1200px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore]);
+
   if (entries.length === 0) {
     return (
       <div className="border border-gold/20 bg-espresso/40 px-6 py-16 text-center">
@@ -234,8 +271,6 @@ export default function JournalAndEvents({
       </div>
     );
   }
-
-  const [featured, ...rest] = visible;
 
   return (
     <MotionConfig reducedMotion="user">
@@ -271,6 +306,8 @@ export default function JournalAndEvents({
           </AnimatePresence>
         </motion.div>
       )}
+
+      {hasMore && <div ref={sentinelRef} aria-hidden className="h-px w-full" />}
     </MotionConfig>
   );
 }

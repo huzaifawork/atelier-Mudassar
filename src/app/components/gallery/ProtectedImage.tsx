@@ -93,7 +93,6 @@ export default function ProtectedImage({
   const [lensPos, setLensPos] = useState({ x: 0, y: 0 });
   const [lensSize, setLensSize] = useState(LENS_SIZE);
   const [showHint, setShowHint] = useState(magnify);
-  const [shouldLoad, setShouldLoad] = useState(false);
 
   // Bucket images resolve to our own /api/gallery/image route, so both bundled
   // assets and admin uploads are local paths the optimizer can handle.
@@ -122,29 +121,58 @@ export default function ProtectedImage({
   // — this still shows the artwork rather than an empty frame.
   const rawSrc = useMemo(() => imageSrcFor(src), [src]);
 
-  // Defer fetching until the card is actually near the viewport — without
-  // this, every grid thumbnail fetches its full-size image the instant the
-  // gallery mounts, regardless of scroll position.
+  /**
+   * Whether this is close enough to the viewport to be worth holding in
+   * memory, which decides both when it loads and when it is let go.
+   *
+   * A drawn card costs a decoded bitmap plus a canvas backing store — several
+   * megabytes each — and batches are appended as the visitor scrolls without
+   * anything ever unmounting. Loading and never releasing means a large
+   * collection climbs until the tab janks, so this stays subscribed rather
+   * than disconnecting after the first intersection.
+   *
+   * The margin is generous in both directions: a card is reclaimed well out
+   * of sight, and starts coming back long before it is seen again — by then
+   * the bytes are in the browser's cache, so the redraw is immediate.
+   *
+   * The lightbox is exempt. It is on screen whenever it exists, and its
+   * magnifier reads the decoded image directly.
+   */
+  const [near, setNear] = useState(magnify);
   useEffect(() => {
+    if (magnify) return;
     const container = rootRef.current;
     if (!container) return;
+
     const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setShouldLoad(true);
-          observer.disconnect();
-        }
-      },
-      // Generous on purpose. This margin was set when a single thumbnail
-      // meant pulling a full-resolution export, so loading early was
-      // expensive; a card is ~50 KB now, and the cost of waiting is that a
-      // visitor scrolling to the gallery watches it fill in. Start well
-      // before they arrive instead.
+      (entries) => setNear(entries[0]?.isIntersecting ?? false),
       { rootMargin: "1500px" },
     );
     observer.observe(container);
     return () => observer.disconnect();
-  }, []);
+  }, [magnify]);
+
+  // Going out of range puts the placeholder back. Adjusted during render
+  // rather than in the effect below, so the frame that drops the pixels is
+  // the same frame that stops claiming they are there.
+  const [wasNear, setWasNear] = useState(near);
+  if (near !== wasNear) {
+    setWasNear(near);
+    if (!near) setReady(false);
+  }
+
+  // Let go of everything heavy once it is far away: the decoded image and the
+  // canvas backing store, which are the megabytes. The canvas keeps its CSS
+  // size and the card its aspect ratio, so nothing on the page moves.
+  useEffect(() => {
+    if (near) return;
+    imgRef.current = null;
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+  }, [near]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -202,7 +230,7 @@ export default function ProtectedImage({
    * missing piece is exactly the shape that failure takes.
    */
   useEffect(() => {
-    if (!shouldLoad || !optimizedSrc) return;
+    if (!near || !optimizedSrc) return;
 
     // Deduped: for a blob:/data: preview the two are the same URL, and there
     // is no point asking for it twice.
@@ -242,7 +270,7 @@ export default function ProtectedImage({
     return () => {
       cancelled = true;
     };
-  }, [shouldLoad, optimizedSrc, rawSrc, draw]);
+  }, [near, optimizedSrc, rawSrc, draw]);
 
   useEffect(() => {
     const container = rootRef.current;
