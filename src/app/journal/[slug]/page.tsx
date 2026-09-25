@@ -10,6 +10,7 @@ import { fetchPostBySlug, fetchPublishedPosts } from "../../lib/blogServer";
 import {
   excerptFor,
   formatPostDate,
+  isRtlText,
   paragraphsOf,
   readingMinutes,
 } from "../../data/blog";
@@ -28,7 +29,7 @@ export async function generateMetadata({
   if (!post) return { title: "Post not found — Atelier Mudassar" };
 
   return {
-    title: `${post.title} — The Journal`,
+    title: `${post.title} — Journal & Events`,
     description: excerptFor(post, 155),
   };
 }
@@ -64,7 +65,7 @@ export default async function BlogPostPage({
             href="/journal"
             className="inline-flex items-center gap-2.5 text-[0.68rem] tracking-[0.28em] uppercase text-cream-dim/70 hover:text-gold-bright transition-colors"
           >
-            <span aria-hidden>←</span> The Journal
+            <span aria-hidden>←</span> Journal &amp; Events
           </Link>
 
           <header className="mt-8 animate-fade-up">
@@ -111,7 +112,14 @@ export default async function BlogPostPage({
             {paragraphs.map((paragraph, index) => (
               <p
                 key={index}
+                dir={isRtlText(paragraph) ? "rtl" : "auto"}
+                lang={isRtlText(paragraph) ? "ur" : undefined}
+                style={{ unicodeBidi: "plaintext" }}
                 className={`text-cream-dim/90 leading-loose text-base sm:text-[1.05rem] whitespace-pre-line ${
+                  isRtlText(paragraph)
+                    ? "text-right font-body leading-[2.15]"
+                    : ""
+                } ${
                   index === 0
                     ? "first-letter:font-display first-letter:text-5xl first-letter:text-gold first-letter:float-left first-letter:mr-3 first-letter:mt-1 first-letter:leading-none"
                     : ""

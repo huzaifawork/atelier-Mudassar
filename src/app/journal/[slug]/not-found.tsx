@@ -33,7 +33,7 @@ export default function PostNotFound() {
             href="/journal"
             className="inline-block mt-9 px-6 py-3 text-[0.72rem] tracking-[0.25em] uppercase border border-gold/50 text-gold hover:bg-gold hover:text-ink transition-all duration-300"
           >
-            Back to the Journal
+            Back to Journal &amp; Events
           </Link>
         </div>
       </main>

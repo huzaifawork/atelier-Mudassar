@@ -1,7 +1,7 @@
 import "server-only";
 import { getPublicClient, type BlogPostRow } from "./supabase";
 import { rowToPost } from "./blogMap";
-import type { BlogPost } from "../data/blog";
+import { slugify, type BlogPost } from "../data/blog";
 
 /**
  * Public reads for /blog and /blog/<slug>.
@@ -33,14 +33,27 @@ export async function fetchPostBySlug(slug: string): Promise<BlogPost | null> {
   if (!supabase) return null;
 
   try {
-    const { data } = await supabase
-      .from("blog_posts")
-      .select("*")
-      .eq("slug", slug)
-      .eq("published", true)
-      .maybeSingle();
+    const raw = decodeURIComponent(slug ?? "").trim();
+    const candidates = Array.from(
+      new Set(
+        [slug, raw, slugify(slug), slugify(raw)]
+          .map((candidate) => candidate?.trim())
+          .filter((candidate): candidate is string => Boolean(candidate && candidate.length > 0)),
+      ),
+    );
 
-    return data ? rowToPost(data as BlogPostRow) : null;
+    for (const candidate of candidates) {
+      const { data } = await supabase
+        .from("blog_posts")
+        .select("*")
+        .eq("slug", candidate)
+        .eq("published", true)
+        .maybeSingle();
+
+      if (data) return rowToPost(data as BlogPostRow);
+    }
+
+    return null;
   } catch {
     return null;
   }

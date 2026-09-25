@@ -136,7 +136,7 @@ export default function Navbar() {
                   onJournal ? "text-gold-bright" : "text-cream-dim hover:text-gold-bright"
                 }`}
               >
-                Journal
+                Journal &amp; Events
                 <span
                   className={`absolute left-0 -bottom-0.5 h-px bg-gold-bright transition-all duration-300 ${
                     onJournal ? "w-full" : "w-0 group-hover:w-full"
@@ -224,7 +224,7 @@ export default function Navbar() {
                     onJournal ? "text-gold" : "text-porcelain hover:text-gold"
                   }`}
                 >
-                  Journal
+                  Journal &amp; Events
                 </Link>
               </motion.div>
               <motion.a

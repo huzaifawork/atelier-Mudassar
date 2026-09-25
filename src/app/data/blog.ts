@@ -27,6 +27,28 @@ export type BlogPostDraft = Omit<BlogPost, "id" | "publishedAt"> & {
   publishedAt?: string;
 };
 
+/** The same URL-safe form used by the admin when it derives a slug from a title.
+ * This keeps accented and non-Latin letters such as Urdu and Arabic instead of
+ * stripping them out, so entries remain discoverable even when the title is
+ * written in the local language.
+ */
+export function slugify(value: string): string {
+  return decodeURIComponent(value ?? "")
+    .normalize("NFKC")
+    .trim()
+    .toLowerCase()
+    .replace(/['\u2019]/g, "")
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/** Urdu, Arabic and Persian text should be laid out right-to-left. */
+export function isRtlText(value: string): boolean {
+  return /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefc]/u.test(value);
+}
+
 /** Paragraphs for rendering: blank lines split, single newlines kept inside. */
 export function paragraphsOf(body: string): string[] {
   return body

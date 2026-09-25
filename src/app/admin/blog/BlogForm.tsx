@@ -7,6 +7,7 @@ import {
   formatPostDate,
   paragraphsOf,
   readingMinutes,
+  slugify,
   type BlogPost,
   type BlogPostDraft,
 } from "../../data/blog";
@@ -18,16 +19,6 @@ const input =
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-bright " +
   "hover:border-gold/40 transition-colors";
 const hint = "mt-1.5 text-xs text-cream-dim/70";
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 
 /** Uploads a cover and returns the "storage:<path>" reference to save on the post. */
 async function uploadCover(file: File): Promise<string> {
